@@ -10,12 +10,12 @@ kopiur-pvc release "{{ .Release.Name }}" installed in namespace {{ $ns }}:
 {{ $pvcName }}:
   - PersistentVolumeClaim/{{ $pvcName }} ({{ $pvcCfg.size }}{{ if $pvcCfg.storageClassName }}, storageClass={{ $pvcCfg.storageClassName }}{{ end }})
 {{- if $populateCfg.enabled }}
-  - Restore/{{ $pvcName }}-restore (passive populator, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }})
+  - Restore/{{ $pvcName }} (passive populator, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }})
 {{- end }}
 {{- if $backupCfg.enabled }}
   - SnapshotPolicy/{{ $pvcName }} -> {{ $backupCfg.repository.kind }}/{{ $backupCfg.repository.name }} (copyMethod={{ $backupCfg.copyMethod }})
 {{- if $backupCfg.schedule.cron }}
-  - SnapshotSchedule/{{ $pvcName }}-schedule (cron="{{ $backupCfg.schedule.cron }}")
+  - SnapshotSchedule/{{ $pvcName }} (cron="{{ $backupCfg.schedule.cron }}")
 {{- else }}
   - No SnapshotSchedule rendered (schedule.cron is empty) — trigger backups manually or with your own SnapshotSchedule/policySelector.
 {{- end }}
