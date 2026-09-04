@@ -62,6 +62,7 @@ helmCharts:
 | `pvc.storageClassName` | `""` | StorageClass; empty = cluster default. |
 | `pvc.volumeMode` | `Filesystem` | `Filesystem` or `Block`. |
 | `pvc.labels` / `pvc.annotations` | `{}` | Extra metadata on the PVC only. |
+| `pvc.extraSpec` | `{}` | Deep-merged into the PVC's `spec`. |
 | `populate.enabled` | `true` | Wire `dataSourceRef` to a passive-populator `Restore`. |
 | `populate.onMissingSnapshot` | `Continue` | `Continue` (bootstrap-friendly) or `Fail`. |
 | `populate.waitTimeout` | `""` | How long to wait for the source snapshot before giving up. |
@@ -70,6 +71,7 @@ helmCharts:
 | `populate.credentialProjection` | `false` | Copy repo credentials into this namespace for the restore Job. |
 | `populate.mover.inheritSecurityContextFrom` | `{snapshot: {}}` | Restore-mover identity. Defaults to the UID/GID kopia *recorded on the backup itself* — the only mode needing no live workload pod, so it works on a freshly rebuilt cluster (exactly what the populator runs before). |
 | `populate.sourcePolicy.name` / `.namespace` | `""` | Restore from a different SnapshotPolicy (defaults to this chart's own policy). |
+| `populate.extraSpec` | `{}` | Deep-merged into `Restore.spec`. |
 | `backup.enabled` | `true` | Render the `SnapshotPolicy` (+ `SnapshotSchedule`). |
 | `backup.repository.kind` / `.name` / `.namespace` | `ClusterRepository` / `s3` / `""` | Repository this PVC backs up to. |
 | `backup.copyMethod` | `Direct` | How the source volume is captured before kopia reads it. **Set to `Snapshot`/`Clone` only if your CSI driver's VolumeSnapshot is a real CoW/delta snapshot** (e.g. Ceph RBD/CephFS) — on a driver that full-copies on snapshot (e.g. proxmox-csi), those modes double storage on every scheduled run. `Direct` reads the live volume with no point-in-time guarantee; give a live database its own policy with a `beforeSnapshot` hook via `extraSpec`. |
@@ -87,10 +89,8 @@ helmCharts:
 | `backup.schedule.cron` | `H 2 * * *` | Cron for the `SnapshotSchedule`; empty renders no schedule. |
 | `backup.schedule.jitter` | `30m` | Deterministic jitter. |
 | `backup.schedule.*` | see `values.yaml` | `runOnCreate`, `timezone`, `suspend`, `concurrencyPolicy`, `startingDeadlineSeconds`. |
+| `backup.schedule.extraSpec` | `{}` | Deep-merged into `SnapshotSchedule.spec`. |
 | `backup.extraSpec` | `{}` | Deep-merged into `SnapshotPolicy.spec` (hooks, files, staging, groupBy, identity, ...). |
-| `backup.scheduleExtraSpec` | `{}` | Deep-merged into `SnapshotSchedule.spec`. |
-| `pvcExtraSpec` | `{}` | Deep-merged into the PVC's `spec`. |
-| `restoreExtraSpec` | `{}` | Deep-merged into `Restore.spec`. |
 | `argocd.enabled` | `true` | Stamp ArgoCD sync-wave + deletion-protection annotations (inert outside ArgoCD). |
 | `argocd.syncWaves.backup` / `.restore` / `.pvc` | `-2` / `-1` / `0` | Apply order: SnapshotPolicy/Schedule, then Restore, then the PVC — so the populator claim exists and resolves before the PVC ever binds. |
 | `argocd.protectPvcFromDeletion` | `true` | Adds `argocd.argoproj.io/sync-options: Prune=false,Delete=false` to the PVC so ArgoCD never deletes the live volume on a prune or a cascading Application delete. |

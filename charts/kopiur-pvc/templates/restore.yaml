@@ -22,7 +22,7 @@
 {{- if .Values.populate.mover -}}
 {{- $_ := set $spec "mover" .Values.populate.mover -}}
 {{- end -}}
-{{- $spec = mergeOverwrite $spec (.Values.restoreExtraSpec | default dict) -}}
+{{- $spec = mergeOverwrite $spec (.Values.populate.extraSpec | default dict) -}}
 {{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) -}}
 {{- if .Values.argocd.enabled -}}
 {{- $_ := set $annotations "argocd.argoproj.io/sync-wave" (.Values.argocd.syncWaves.restore | toString) -}}

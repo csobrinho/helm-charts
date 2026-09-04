@@ -25,6 +25,8 @@ pvc:
   labels: {}
   # -- Extra annotations for the PVC only.
   annotations: {}
+  # -- Escape hatch: extra fields deep-merged into the PersistentVolumeClaim.spec.
+  extraSpec: {}
 
 populate:
   # -- Wire the PVC's spec.dataSourceRef to a kopiur Restore in passive-populator
@@ -51,7 +53,7 @@ populate:
     # the only mode that needs no live workload pod, so it works on a freshly
     # rebuilt cluster and is exactly what `target.populator` runs before. Override
     # or set to `{}` to fall back to `mover.securityContext`/`podSecurityContext`
-    # (merge those in via `restoreExtraSpec` if needed).
+    # (merge those in via `populate.extraSpec` if needed).
     inheritSecurityContextFrom:
       snapshot: {}
   sourcePolicy:
@@ -62,6 +64,8 @@ populate:
     name: ""
     # -- Namespace of the source SnapshotPolicy. Empty defaults to this release's namespace.
     namespace: ""
+  # -- Escape hatch: extra fields deep-merged into Restore.spec.
+  extraSpec: {}
 
 backup:
   # -- Create a SnapshotPolicy (and, when schedule.cron is set, a
@@ -150,15 +154,10 @@ backup:
     concurrencyPolicy: Forbid
     # -- If a slot is missed by more than this many seconds, skip it instead of firing late.
     startingDeadlineSeconds: null
+    # -- Escape hatch: extra fields deep-merged into SnapshotSchedule.spec.
+    extraSpec: {}
   # -- Escape hatch: extra fields deep-merged into SnapshotPolicy.spec (wins over the generated values above). Use for hooks, files, staging, groupBy, identity, etc.
   extraSpec: {}
-  # -- Escape hatch: extra fields deep-merged into SnapshotSchedule.spec.
-  scheduleExtraSpec: {}
-
-# -- Escape hatch: extra fields deep-merged into the PersistentVolumeClaim.spec.
-pvcExtraSpec: {}
-# -- Escape hatch: extra fields deep-merged into Restore.spec.
-restoreExtraSpec: {}
 
 argocd:
   # -- Stamp ArgoCD annotations on the rendered resources (sync-wave ordering +

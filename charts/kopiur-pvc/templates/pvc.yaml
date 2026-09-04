@@ -10,7 +10,7 @@
 {{- if .Values.populate.enabled -}}
 {{- $_ := set $spec "dataSourceRef" (dict "apiGroup" "kopiur.home-operations.com" "kind" "Restore" "name" (include "kopiur-pvc.restoreName" .)) -}}
 {{- end -}}
-{{- $spec = mergeOverwrite $spec (.Values.pvcExtraSpec | default dict) -}}
+{{- $spec = mergeOverwrite $spec (.Values.pvc.extraSpec | default dict) -}}
 {{- $labels := mergeOverwrite (dict) (fromYaml (include "kopiur-pvc.labels" .)) (.Values.pvc.labels | default dict) -}}
 {{- $argoAnnotations := dict -}}
 {{- if .Values.argocd.enabled -}}

@@ -9,7 +9,7 @@
 {{- if .Values.backup.schedule.runOnCreate -}}{{- $_ := set $schedule "runOnCreate" true -}}{{- end -}}
 {{- if .Values.backup.schedule.suspend -}}{{- $_ := set $schedule "suspend" true -}}{{- end -}}
 {{- $spec := dict "policyRef" (dict "name" $name) "schedule" $schedule -}}
-{{- $spec = mergeOverwrite $spec (.Values.backup.scheduleExtraSpec | default dict) -}}
+{{- $spec = mergeOverwrite $spec (.Values.backup.schedule.extraSpec | default dict) -}}
 {{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) -}}
 {{- if .Values.argocd.enabled -}}
 {{- $_ := set $annotations "argocd.argoproj.io/sync-wave" (.Values.argocd.syncWaves.backup | toString) -}}
