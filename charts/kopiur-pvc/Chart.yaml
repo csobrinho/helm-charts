@@ -7,7 +7,9 @@ description: >-
   deploy-or-restored from the latest snapshot automatically.
 type: application
 version: 0.1.0
-appVersion: "1.0.0"
+# kopiur is v1alpha1 and its CRD surface moves between releases; this chart's
+# field names/shapes were verified against the kopiur v0.10.7 CRDs.
+appVersion: "0.10.7"
 home: https://github.com/csobrinho/helm-charts
 sources:
   - https://github.com/csobrinho/helm-charts
@@ -21,3 +23,5 @@ keywords:
 maintainers:
   - name: csobrinho
     url: https://github.com/csobrinho
+annotations:
+  org.opencontainers.image.source: https://github.com/csobrinho/helm-charts
