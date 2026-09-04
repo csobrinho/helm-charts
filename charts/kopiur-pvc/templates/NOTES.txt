@@ -1,0 +1,16 @@
+kopiur-pvc "{{ include "kopiur-pvc.name" . }}" installed in namespace {{ include "kopiur-pvc.namespace" . }}:
+
+- PersistentVolumeClaim/{{ include "kopiur-pvc.name" . }} ({{ .Values.pvc.size }}{{ if .Values.pvc.storageClassName }}, storageClass={{ .Values.pvc.storageClassName }}{{ end }})
+{{- if .Values.populate.enabled }}
+- Restore/{{ include "kopiur-pvc.restoreName" . }} (passive populator, onMissingSnapshot={{ .Values.populate.onMissingSnapshot }})
+{{- end }}
+{{- if .Values.backup.enabled }}
+- SnapshotPolicy/{{ include "kopiur-pvc.name" . }} -> {{ .Values.backup.repository.kind }}/{{ .Values.backup.repository.name }}
+{{- if .Values.backup.schedule.cron }}
+- SnapshotSchedule/{{ include "kopiur-pvc.scheduleName" . }} (cron="{{ .Values.backup.schedule.cron }}")
+{{- else }}
+- No SnapshotSchedule rendered (backup.schedule.cron is empty) — trigger backups manually or with your own SnapshotSchedule/policySelector.
+{{- end }}
+{{- else }}
+- backup.enabled=false — no SnapshotPolicy/SnapshotSchedule created; this PVC is not backed up.
+{{- end }}

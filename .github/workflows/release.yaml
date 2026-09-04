@@ -1,0 +1,59 @@
+name: Release Charts (OCI)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "charts/**/Chart.yaml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  OCI_REPO: ghcr.io/${{ github.repository_owner }}/charts
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: "4.2.4"
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" --password-stdin
+
+      # Each chart under charts/<name> is pushed to oci://ghcr.io/<owner>/charts/<name>.
+      # A chart's version (Chart.yaml) must be bumped for a change to publish — an
+      # unchanged version is skipped (idempotent, and OCI registries refuse to
+      # overwrite an existing tag anyway).
+      - name: Package & push changed charts
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dist
+
+          for chart_yaml in charts/*/Chart.yaml; do
+            chart_dir="$(dirname "$chart_yaml")"
+            name="$(yq -r '.name' "$chart_yaml")"
+            version="$(yq -r '.version' "$chart_yaml")"
+            ref="oci://${OCI_REPO}/${name}"
+
+            if helm show chart "$ref" --version "$version" >/dev/null 2>&1; then
+              echo "${name}-${version} already published at ${ref}, skipping"
+              continue
+            fi
+
+            echo "Publishing ${name}-${version} to ${ref}"
+            helm package "$chart_dir" -d /tmp/dist
+            helm push "/tmp/dist/${name}-${version}.tgz" "oci://${OCI_REPO}"
+          done

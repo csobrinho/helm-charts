@@ -1,0 +1,28 @@
+{{- $name := include "kopiur-pvc.name" . -}}
+{{- $ns := include "kopiur-pvc.namespace" . -}}
+{{- $spec := dict "accessModes" .Values.pvc.accessModes "resources" (dict "requests" (dict "storage" .Values.pvc.size)) -}}
+{{- if .Values.pvc.storageClassName -}}
+{{- $_ := set $spec "storageClassName" .Values.pvc.storageClassName -}}
+{{- end -}}
+{{- if .Values.pvc.volumeMode -}}
+{{- $_ := set $spec "volumeMode" .Values.pvc.volumeMode -}}
+{{- end -}}
+{{- if .Values.populate.enabled -}}
+{{- $_ := set $spec "dataSourceRef" (dict "apiGroup" "kopiur.home-operations.com" "kind" "Restore" "name" (include "kopiur-pvc.restoreName" .)) -}}
+{{- end -}}
+{{- $spec = mergeOverwrite $spec (.Values.pvcExtraSpec | default dict) -}}
+{{- $labels := mergeOverwrite (dict) (fromYaml (include "kopiur-pvc.labels" .)) (.Values.pvc.labels | default dict) -}}
+{{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) (.Values.pvc.annotations | default dict) -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+  {{- if $annotations }}
+  annotations:
+    {{- toYaml $annotations | nindent 4 }}
+  {{- end }}
+spec:
+  {{- toYaml $spec | nindent 2 }}

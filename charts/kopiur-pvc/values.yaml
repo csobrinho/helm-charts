@@ -1,0 +1,111 @@
+---
+# yaml-language-server: $schema=values.schema.json
+
+# -- Override the name used for the PVC / SnapshotPolicy / SnapshotSchedule / Restore (defaults to the release name).
+nameOverride: ""
+# -- Override the namespace resources are created in (defaults to the release namespace).
+namespaceOverride: ""
+
+# -- Labels applied to every resource this chart renders, on top of the standard app.kubernetes.io/* labels.
+commonLabels: {}
+# -- Annotations applied to every resource this chart renders.
+commonAnnotations: {}
+
+pvc:
+  # -- Access modes for the PVC.
+  accessModes:
+    - ReadWriteOnce
+  # -- Requested size of the PVC (e.g. "10Gi").
+  size: 10Gi
+  # -- StorageClass for the PVC; empty uses the cluster default StorageClass.
+  storageClassName: ""
+  # -- volumeMode for the PVC: Filesystem or Block.
+  volumeMode: Filesystem
+  # -- Extra labels for the PVC only.
+  labels: {}
+  # -- Extra annotations for the PVC only.
+  annotations: {}
+
+populate:
+  # -- Wire the PVC's spec.dataSourceRef to a kopiur Restore in passive-populator
+  # mode, so a brand-new/empty PVC is deploy-or-restored from the backup
+  # SnapshotPolicy's latest snapshot before it is ever bound. Requires the
+  # kopiur controller to be installed with installScope=cluster (the default) —
+  # the populator path is refused under installScope=namespaced.
+  enabled: true
+  # -- What to do when no snapshot exists yet (first-ever deploy, empty
+  # repository). `Continue` provisions an empty volume so the app can start
+  # and take its first backup; `Fail` refuses to bind the PVC instead.
+  onMissingSnapshot: Continue
+  # -- How long to wait for the source snapshot to appear before giving up (e.g. "5m"). Empty uses the controller default.
+  waitTimeout: ""
+  # -- Which snapshot to restore: 0 = latest, 1 = previous, and so on.
+  offset: 0
+  # -- Restore the newest snapshot at or before this RFC3339 timestamp (point-in-time restore). Empty = latest.
+  asOf: ""
+  # -- Copy the repository's credential Secret(s) into this namespace for the restore Job. Requires the kopiur controller's features.credentialProjection.enabled=true.
+  credentialProjection: false
+  sourcePolicy:
+    # -- Name of the SnapshotPolicy to restore from. Empty defaults to the
+    # SnapshotPolicy this chart creates (the normal self-restore case). Set
+    # this to restore from a *different* policy/namespace, e.g. when
+    # migrating a PVC's data to a new name or cluster.
+    name: ""
+    # -- Namespace of the source SnapshotPolicy. Empty defaults to this release's namespace.
+    namespace: ""
+
+backup:
+  # -- Create a SnapshotPolicy (and, when schedule.cron is set, a
+  # SnapshotSchedule) that backs up this PVC to a kopiur repository.
+  enabled: true
+  repository:
+    # -- Which repository CRD this points at: "Repository" or "ClusterRepository".
+    kind: ClusterRepository
+    # -- Name of the referenced Repository/ClusterRepository.
+    name: s3
+    # -- Cross-namespace Repository reference; ignored/forbidden for ClusterRepository.
+    namespace: ""
+  # -- VolumeSnapshotClass used for the CSI-snapshot copy method. Empty omits the field (kopiur/CSI default applies).
+  volumeSnapshotClassName: ""
+  # -- Kopia compression settings, e.g. {compressor: zstd}. Set to {} to omit.
+  compression:
+    compressor: zstd
+  # -- GFS retention policy for snapshots this policy produces.
+  retention:
+    keepLatest: 3
+    keepHourly: 24
+    keepDaily: 7
+    keepWeekly: 4
+    keepMonthly: 6
+    keepAnnual: 0
+  # -- Per-run mover overrides (resources, cache, securityContext) for backup Jobs. Set to {} to omit.
+  mover: {}
+  credentialProjection:
+    # -- Copy the repository's credential Secret(s) into this namespace for each backup mover Job.
+    enabled: false
+  # -- Skip future scheduled runs while true (the policy still exists; a manual Snapshot can still be created).
+  suspend: false
+  schedule:
+    # -- Cron expression (Jenkins-style "H" substitution supported, e.g. "H 2 * * *"). Empty = no SnapshotSchedule is rendered (the SnapshotPolicy still exists and can be triggered manually or by an external SnapshotSchedule).
+    cron: "H 2 * * *"
+    # -- Deterministic jitter applied to the cron firing (Go-style duration).
+    jitter: 30m
+    # -- Fire immediately when the SnapshotSchedule is created, in addition to the cron cadence.
+    runOnCreate: false
+    # -- IANA timezone the cron is evaluated in; empty uses the controller's default.
+    timezone: ""
+    # -- Skip future firings while true.
+    suspend: false
+    # -- How to handle a firing while a prior run is still in flight: Forbid, Allow, or Replace.
+    concurrencyPolicy: Forbid
+    # -- If a slot is missed by more than this many seconds, skip it instead of firing late.
+    startingDeadlineSeconds: null
+  # -- Escape hatch: extra fields deep-merged into SnapshotPolicy.spec (wins over the generated values above). Use for hooks, files, staging, groupBy, identity, etc.
+  extraSpec: {}
+  # -- Escape hatch: extra fields deep-merged into SnapshotSchedule.spec.
+  scheduleExtraSpec: {}
+
+# -- Escape hatch: extra fields deep-merged into the PersistentVolumeClaim.spec.
+pvcExtraSpec: {}
+# -- Escape hatch: extra fields deep-merged into Restore.spec.
+restoreExtraSpec: {}

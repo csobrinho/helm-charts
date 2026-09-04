@@ -1,0 +1,26 @@
+{{- if and .Values.backup.enabled .Values.backup.schedule .Values.backup.schedule.cron }}
+{{- $name := include "kopiur-pvc.name" . -}}
+{{- $ns := include "kopiur-pvc.namespace" . -}}
+{{- $schedule := dict "cron" .Values.backup.schedule.cron -}}
+{{- if .Values.backup.schedule.jitter -}}{{- $_ := set $schedule "jitter" .Values.backup.schedule.jitter -}}{{- end -}}
+{{- if .Values.backup.schedule.timezone -}}{{- $_ := set $schedule "timezone" .Values.backup.schedule.timezone -}}{{- end -}}
+{{- if .Values.backup.schedule.concurrencyPolicy -}}{{- $_ := set $schedule "concurrencyPolicy" .Values.backup.schedule.concurrencyPolicy -}}{{- end -}}
+{{- if .Values.backup.schedule.startingDeadlineSeconds -}}{{- $_ := set $schedule "startingDeadlineSeconds" .Values.backup.schedule.startingDeadlineSeconds -}}{{- end -}}
+{{- if .Values.backup.schedule.runOnCreate -}}{{- $_ := set $schedule "runOnCreate" true -}}{{- end -}}
+{{- if .Values.backup.schedule.suspend -}}{{- $_ := set $schedule "suspend" true -}}{{- end -}}
+{{- $spec := dict "policyRef" (dict "name" $name) "schedule" $schedule -}}
+{{- $spec = mergeOverwrite $spec (.Values.backup.scheduleExtraSpec | default dict) -}}
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotSchedule
+metadata:
+  name: {{ include "kopiur-pvc.scheduleName" . }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "kopiur-pvc.labels" . | nindent 4 }}
+  {{- with (include "kopiur-pvc.annotations" . | trim) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}

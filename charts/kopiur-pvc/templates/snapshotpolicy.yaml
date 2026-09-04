@@ -1,0 +1,41 @@
+{{- if .Values.backup.enabled }}
+{{- $name := include "kopiur-pvc.name" . -}}
+{{- $ns := include "kopiur-pvc.namespace" . -}}
+{{- $repo := dict "kind" .Values.backup.repository.kind "name" .Values.backup.repository.name -}}
+{{- if .Values.backup.repository.namespace -}}
+{{- $_ := set $repo "namespace" .Values.backup.repository.namespace -}}
+{{- end -}}
+{{- $spec := dict "repository" $repo "sources" (list (dict "pvc" (dict "name" $name))) -}}
+{{- if .Values.backup.volumeSnapshotClassName -}}
+{{- $_ := set $spec "volumeSnapshotClassName" .Values.backup.volumeSnapshotClassName -}}
+{{- end -}}
+{{- if .Values.backup.compression -}}
+{{- $_ := set $spec "compression" .Values.backup.compression -}}
+{{- end -}}
+{{- if .Values.backup.retention -}}
+{{- $_ := set $spec "retention" .Values.backup.retention -}}
+{{- end -}}
+{{- if .Values.backup.mover -}}
+{{- $_ := set $spec "mover" .Values.backup.mover -}}
+{{- end -}}
+{{- if .Values.backup.credentialProjection.enabled -}}
+{{- $_ := set $spec "credentialProjection" .Values.backup.credentialProjection -}}
+{{- end -}}
+{{- if .Values.backup.suspend -}}
+{{- $_ := set $spec "suspend" true -}}
+{{- end -}}
+{{- $spec = mergeOverwrite $spec (.Values.backup.extraSpec | default dict) -}}
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotPolicy
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "kopiur-pvc.labels" . | nindent 4 }}
+  {{- with (include "kopiur-pvc.annotations" . | trim) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}

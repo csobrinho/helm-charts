@@ -1,0 +1,23 @@
+apiVersion: v2
+name: kopiur-pvc
+description: >-
+  Creates a PersistentVolumeClaim wired to kopiur (a Kopia-native Kubernetes
+  backup operator): a SnapshotPolicy + SnapshotSchedule for scheduled
+  backups, and a Restore in passive-populator mode so a new/empty PVC is
+  deploy-or-restored from the latest snapshot automatically.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/csobrinho/helm-charts
+sources:
+  - https://github.com/csobrinho/helm-charts
+  - https://github.com/home-operations/kopiur
+keywords:
+  - kopiur
+  - kopia
+  - backup
+  - pvc
+  - snapshot
+maintainers:
+  - name: csobrinho
+    url: https://github.com/csobrinho

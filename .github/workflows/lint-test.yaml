@@ -1,0 +1,54 @@
+name: Lint & Test Charts
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "charts/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "charts/**"
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: "4.2.4"
+
+      - name: Install kubeconform
+        run: |
+          wget -q https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Lint, template & validate every chart
+        run: |
+          set -euo pipefail
+
+          for chart_dir in charts/*/; do
+            name="$(basename "$chart_dir")"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🔍 ${name}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            helm lint "$chart_dir"
+
+            rendered="/tmp/${name}-rendered.yaml"
+            helm template "$name" "$chart_dir" --namespace default > "$rendered"
+
+            # kopiur's kopiur.home-operations.com CRDs (and any other CRD) have no
+            # public JSON-schema catalog entry, so their schema lookup is skipped
+            # rather than failed; core Kubernetes kinds (PVC, etc.) are still
+            # fully validated.
+            kubeconform -ignore-missing-schemas -summary -output pretty "$rendered"
+          done

@@ -1,0 +1,36 @@
+{{- if .Values.populate.enabled }}
+{{- $name := include "kopiur-pvc.name" . -}}
+{{- $ns := include "kopiur-pvc.namespace" . -}}
+{{- $policyRef := dict "name" (.Values.populate.sourcePolicy.name | default $name) -}}
+{{- if .Values.populate.sourcePolicy.namespace -}}
+{{- $_ := set $policyRef "namespace" .Values.populate.sourcePolicy.namespace -}}
+{{- end -}}
+{{- if .Values.populate.offset -}}
+{{- $_ := set $policyRef "offset" .Values.populate.offset -}}
+{{- end -}}
+{{- if .Values.populate.asOf -}}
+{{- $_ := set $policyRef "asOf" .Values.populate.asOf -}}
+{{- end -}}
+{{- $policy := dict "onMissingSnapshot" .Values.populate.onMissingSnapshot -}}
+{{- if .Values.populate.waitTimeout -}}
+{{- $_ := set $policy "waitTimeout" .Values.populate.waitTimeout -}}
+{{- end -}}
+{{- $spec := dict "source" (dict "fromPolicy" $policyRef) "target" (dict "populator" dict) "policy" $policy -}}
+{{- if .Values.populate.credentialProjection -}}
+{{- $_ := set $spec "credentialProjection" (dict "enabled" true) -}}
+{{- end -}}
+{{- $spec = mergeOverwrite $spec (.Values.restoreExtraSpec | default dict) -}}
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: Restore
+metadata:
+  name: {{ include "kopiur-pvc.restoreName" . }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "kopiur-pvc.labels" . | nindent 4 }}
+  {{- with (include "kopiur-pvc.annotations" . | trim) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}
