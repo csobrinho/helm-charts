@@ -1,30 +1,37 @@
-{{- if and .Values.backup.enabled .Values.backup.schedule .Values.backup.schedule.cron }}
-{{- $name := include "kopiur-pvc.name" . -}}
 {{- $ns := include "kopiur-pvc.namespace" . -}}
-{{- $schedule := dict "cron" .Values.backup.schedule.cron -}}
-{{- if .Values.backup.schedule.jitter -}}{{- $_ := set $schedule "jitter" .Values.backup.schedule.jitter -}}{{- end -}}
-{{- if .Values.backup.schedule.timezone -}}{{- $_ := set $schedule "timezone" .Values.backup.schedule.timezone -}}{{- end -}}
-{{- if .Values.backup.schedule.concurrencyPolicy -}}{{- $_ := set $schedule "concurrencyPolicy" .Values.backup.schedule.concurrencyPolicy -}}{{- end -}}
-{{- if .Values.backup.schedule.startingDeadlineSeconds -}}{{- $_ := set $schedule "startingDeadlineSeconds" .Values.backup.schedule.startingDeadlineSeconds -}}{{- end -}}
-{{- if .Values.backup.schedule.runOnCreate -}}{{- $_ := set $schedule "runOnCreate" true -}}{{- end -}}
-{{- if .Values.backup.schedule.suspend -}}{{- $_ := set $schedule "suspend" true -}}{{- end -}}
-{{- $spec := dict "policyRef" (dict "name" $name) "schedule" $schedule -}}
-{{- $spec = mergeOverwrite $spec (.Values.backup.schedule.extraSpec | default dict) -}}
-{{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) -}}
-{{- if .Values.argocd.enabled -}}
-{{- $_ := set $annotations "argocd.argoproj.io/sync-wave" (.Values.argocd.syncWaves.backup | toString) -}}
+{{- $items := fromYaml (include "kopiur-pvc.items" .) -}}
+{{- range $pvcName, $override := $items }}
+{{- $override = $override | default dict -}}
+{{- $backupCfg := mergeOverwrite (deepCopy $.Values.backup) ($override.backup | default dict) -}}
+{{- if and $backupCfg.enabled $backupCfg.schedule $backupCfg.schedule.cron }}
+{{- $schedule := dict "cron" $backupCfg.schedule.cron -}}
+{{- if $backupCfg.schedule.jitter -}}{{- $_ := set $schedule "jitter" $backupCfg.schedule.jitter -}}{{- end -}}
+{{- if $backupCfg.schedule.timezone -}}{{- $_ := set $schedule "timezone" $backupCfg.schedule.timezone -}}{{- end -}}
+{{- if $backupCfg.schedule.concurrencyPolicy -}}{{- $_ := set $schedule "concurrencyPolicy" $backupCfg.schedule.concurrencyPolicy -}}{{- end -}}
+{{- if $backupCfg.schedule.startingDeadlineSeconds -}}{{- $_ := set $schedule "startingDeadlineSeconds" $backupCfg.schedule.startingDeadlineSeconds -}}{{- end -}}
+{{- if $backupCfg.schedule.runOnCreate -}}{{- $_ := set $schedule "runOnCreate" true -}}{{- end -}}
+{{- if $backupCfg.schedule.suspend -}}{{- $_ := set $schedule "suspend" true -}}{{- end -}}
+{{- $spec := dict "policyRef" (dict "name" $pvcName) "schedule" $schedule -}}
+{{- $spec = mergeOverwrite $spec ($backupCfg.schedule.extraSpec | default dict) -}}
+{{- $labels := mergeOverwrite (dict "app.kubernetes.io/name" $pvcName) (fromYaml (include "kopiur-pvc.labels" $)) -}}
+{{- $annotations := dict -}}
+{{- if $.Values.argocd.enabled -}}
+{{- $_ := set $annotations "argocd.argoproj.io/sync-wave" ($.Values.argocd.syncWaves.backup | toString) -}}
 {{- end -}}
+{{- $annotations = mergeOverwrite $annotations ($.Values.commonAnnotations | default dict) -}}
+---
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: SnapshotSchedule
 metadata:
-  name: {{ include "kopiur-pvc.scheduleName" . }}
+  name: {{ printf "%s-schedule" $pvcName }}
   namespace: {{ $ns }}
   labels:
-    {{- include "kopiur-pvc.labels" . | nindent 4 }}
+    {{- toYaml $labels | nindent 4 }}
   {{- if $annotations }}
   annotations:
     {{- toYaml $annotations | nindent 4 }}
   {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}
+{{- end }}
 {{- end }}

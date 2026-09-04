@@ -1,43 +1,50 @@
-{{- if .Values.populate.enabled }}
-{{- $name := include "kopiur-pvc.name" . -}}
 {{- $ns := include "kopiur-pvc.namespace" . -}}
-{{- $policyRef := dict "name" (.Values.populate.sourcePolicy.name | default $name) -}}
-{{- if .Values.populate.sourcePolicy.namespace -}}
-{{- $_ := set $policyRef "namespace" .Values.populate.sourcePolicy.namespace -}}
+{{- $items := fromYaml (include "kopiur-pvc.items" .) -}}
+{{- range $pvcName, $override := $items }}
+{{- $override = $override | default dict -}}
+{{- $populateCfg := mergeOverwrite (deepCopy $.Values.populate) ($override.populate | default dict) -}}
+{{- if $populateCfg.enabled }}
+{{- $policyRef := dict "name" ($populateCfg.sourcePolicy.name | default $pvcName) -}}
+{{- if $populateCfg.sourcePolicy.namespace -}}
+{{- $_ := set $policyRef "namespace" $populateCfg.sourcePolicy.namespace -}}
 {{- end -}}
-{{- if .Values.populate.offset -}}
-{{- $_ := set $policyRef "offset" .Values.populate.offset -}}
+{{- if $populateCfg.offset -}}
+{{- $_ := set $policyRef "offset" $populateCfg.offset -}}
 {{- end -}}
-{{- if .Values.populate.asOf -}}
-{{- $_ := set $policyRef "asOf" .Values.populate.asOf -}}
+{{- if $populateCfg.asOf -}}
+{{- $_ := set $policyRef "asOf" $populateCfg.asOf -}}
 {{- end -}}
-{{- $policy := dict "onMissingSnapshot" .Values.populate.onMissingSnapshot -}}
-{{- if .Values.populate.waitTimeout -}}
-{{- $_ := set $policy "waitTimeout" .Values.populate.waitTimeout -}}
+{{- $policy := dict "onMissingSnapshot" $populateCfg.onMissingSnapshot -}}
+{{- if $populateCfg.waitTimeout -}}
+{{- $_ := set $policy "waitTimeout" $populateCfg.waitTimeout -}}
 {{- end -}}
 {{- $spec := dict "source" (dict "fromPolicy" $policyRef) "target" (dict "populator" dict) "policy" $policy -}}
-{{- if .Values.populate.credentialProjection -}}
+{{- if $populateCfg.credentialProjection -}}
 {{- $_ := set $spec "credentialProjection" (dict "enabled" true) -}}
 {{- end -}}
-{{- if .Values.populate.mover -}}
-{{- $_ := set $spec "mover" .Values.populate.mover -}}
+{{- if $populateCfg.mover -}}
+{{- $_ := set $spec "mover" $populateCfg.mover -}}
 {{- end -}}
-{{- $spec = mergeOverwrite $spec (.Values.populate.extraSpec | default dict) -}}
-{{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) -}}
-{{- if .Values.argocd.enabled -}}
-{{- $_ := set $annotations "argocd.argoproj.io/sync-wave" (.Values.argocd.syncWaves.restore | toString) -}}
+{{- $spec = mergeOverwrite $spec ($populateCfg.extraSpec | default dict) -}}
+{{- $labels := mergeOverwrite (dict "app.kubernetes.io/name" $pvcName) (fromYaml (include "kopiur-pvc.labels" $)) -}}
+{{- $annotations := dict -}}
+{{- if $.Values.argocd.enabled -}}
+{{- $_ := set $annotations "argocd.argoproj.io/sync-wave" ($.Values.argocd.syncWaves.restore | toString) -}}
 {{- end -}}
+{{- $annotations = mergeOverwrite $annotations ($.Values.commonAnnotations | default dict) -}}
+---
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: Restore
 metadata:
-  name: {{ include "kopiur-pvc.restoreName" . }}
+  name: {{ printf "%s-restore" $pvcName }}
   namespace: {{ $ns }}
   labels:
-    {{- include "kopiur-pvc.labels" . | nindent 4 }}
+    {{- toYaml $labels | nindent 4 }}
   {{- if $annotations }}
   annotations:
     {{- toYaml $annotations | nindent 4 }}
   {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}
+{{- end }}
 {{- end }}

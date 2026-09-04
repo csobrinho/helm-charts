@@ -1,60 +1,67 @@
-{{- if .Values.backup.enabled }}
-{{- $name := include "kopiur-pvc.name" . -}}
 {{- $ns := include "kopiur-pvc.namespace" . -}}
-{{- $repo := dict "kind" .Values.backup.repository.kind "name" .Values.backup.repository.name -}}
-{{- if .Values.backup.repository.namespace -}}
-{{- $_ := set $repo "namespace" .Values.backup.repository.namespace -}}
+{{- $items := fromYaml (include "kopiur-pvc.items" .) -}}
+{{- range $pvcName, $override := $items }}
+{{- $override = $override | default dict -}}
+{{- $backupCfg := mergeOverwrite (deepCopy $.Values.backup) ($override.backup | default dict) -}}
+{{- if $backupCfg.enabled }}
+{{- $repo := dict "kind" $backupCfg.repository.kind "name" $backupCfg.repository.name -}}
+{{- if $backupCfg.repository.namespace -}}
+{{- $_ := set $repo "namespace" $backupCfg.repository.namespace -}}
 {{- end -}}
-{{- $source := dict "pvc" (dict "name" $name) "readOnly" .Values.backup.readOnly -}}
-{{- if .Values.backup.acknowledgeLiveMutation -}}
+{{- $source := dict "pvc" (dict "name" $pvcName) "readOnly" $backupCfg.readOnly -}}
+{{- if $backupCfg.acknowledgeLiveMutation -}}
 {{- $_ := set $source "acknowledgeLiveMutation" true -}}
 {{- end -}}
-{{- $spec := dict "repository" $repo "sources" (list $source) "copyMethod" .Values.backup.copyMethod -}}
-{{- if .Values.backup.volumeSnapshotClassName -}}
-{{- $_ := set $spec "volumeSnapshotClassName" .Values.backup.volumeSnapshotClassName -}}
+{{- $spec := dict "repository" $repo "sources" (list $source) "copyMethod" $backupCfg.copyMethod -}}
+{{- if $backupCfg.volumeSnapshotClassName -}}
+{{- $_ := set $spec "volumeSnapshotClassName" $backupCfg.volumeSnapshotClassName -}}
 {{- end -}}
-{{- if .Values.backup.compression -}}
-{{- $_ := set $spec "compression" .Values.backup.compression -}}
+{{- if $backupCfg.compression -}}
+{{- $_ := set $spec "compression" $backupCfg.compression -}}
 {{- end -}}
-{{- if .Values.backup.retention -}}
-{{- $_ := set $spec "retention" .Values.backup.retention -}}
+{{- if $backupCfg.retention -}}
+{{- $_ := set $spec "retention" $backupCfg.retention -}}
 {{- end -}}
 {{- $mover := dict -}}
-{{- if .Values.backup.inheritSecurityContextFrom -}}
-{{- $_ := set $mover "inheritSecurityContextFrom" .Values.backup.inheritSecurityContextFrom -}}
+{{- if $backupCfg.inheritSecurityContextFrom -}}
+{{- $_ := set $mover "inheritSecurityContextFrom" $backupCfg.inheritSecurityContextFrom -}}
 {{- end -}}
-{{- $mover = mergeOverwrite $mover (.Values.backup.mover | default dict) -}}
+{{- $mover = mergeOverwrite $mover ($backupCfg.mover | default dict) -}}
 {{- if $mover -}}
 {{- $_ := set $spec "mover" $mover -}}
 {{- end -}}
-{{- if .Values.backup.errorHandling -}}
-{{- $_ := set $spec "errorHandling" .Values.backup.errorHandling -}}
+{{- if $backupCfg.errorHandling -}}
+{{- $_ := set $spec "errorHandling" $backupCfg.errorHandling -}}
 {{- end -}}
-{{- if .Values.backup.verification -}}
-{{- $_ := set $spec "verification" .Values.backup.verification -}}
+{{- if $backupCfg.verification -}}
+{{- $_ := set $spec "verification" $backupCfg.verification -}}
 {{- end -}}
-{{- if .Values.backup.credentialProjection.enabled -}}
-{{- $_ := set $spec "credentialProjection" .Values.backup.credentialProjection -}}
+{{- if $backupCfg.credentialProjection.enabled -}}
+{{- $_ := set $spec "credentialProjection" $backupCfg.credentialProjection -}}
 {{- end -}}
-{{- if .Values.backup.suspend -}}
+{{- if $backupCfg.suspend -}}
 {{- $_ := set $spec "suspend" true -}}
 {{- end -}}
-{{- $spec = mergeOverwrite $spec (.Values.backup.extraSpec | default dict) -}}
-{{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) -}}
-{{- if .Values.argocd.enabled -}}
-{{- $_ := set $annotations "argocd.argoproj.io/sync-wave" (.Values.argocd.syncWaves.backup | toString) -}}
+{{- $spec = mergeOverwrite $spec ($backupCfg.extraSpec | default dict) -}}
+{{- $labels := mergeOverwrite (dict "app.kubernetes.io/name" $pvcName) (fromYaml (include "kopiur-pvc.labels" $)) -}}
+{{- $annotations := dict -}}
+{{- if $.Values.argocd.enabled -}}
+{{- $_ := set $annotations "argocd.argoproj.io/sync-wave" ($.Values.argocd.syncWaves.backup | toString) -}}
 {{- end -}}
+{{- $annotations = mergeOverwrite $annotations ($.Values.commonAnnotations | default dict) -}}
+---
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: SnapshotPolicy
 metadata:
-  name: {{ $name }}
+  name: {{ $pvcName }}
   namespace: {{ $ns }}
   labels:
-    {{- include "kopiur-pvc.labels" . | nindent 4 }}
+    {{- toYaml $labels | nindent 4 }}
   {{- if $annotations }}
   annotations:
     {{- toYaml $annotations | nindent 4 }}
   {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}
+{{- end }}
 {{- end }}

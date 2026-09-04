@@ -1,0 +1,15 @@
+# chart-testing (ct install) values: exercises the SnapshotPolicy/SnapshotSchedule
+# admission path against a real kopiur controller + a real (in-cluster MinIO)
+# ClusterRepository named "ci-test" (set up by the workflow before `ct install`
+# runs). populate is disabled here — the dataSourceRef/populator round-trip
+# needs a real cluster and isn't something CI can reliably wait on within a
+# short timeout; verify it manually against the target cluster before relying
+# on it (see the chart README).
+pvc:
+  size: 64Mi
+populate:
+  enabled: false
+backup:
+  repository:
+    kind: ClusterRepository
+    name: ci-test

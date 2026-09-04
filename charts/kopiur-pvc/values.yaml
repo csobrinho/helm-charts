@@ -1,15 +1,44 @@
 ---
 # yaml-language-server: $schema=values.schema.json
 
-# -- Override the name used for the PVC / SnapshotPolicy / SnapshotSchedule / Restore (defaults to the release name).
+# -- Name of the single PVC when `pvcs` (below) is left empty (defaults to the
+# release name). Ignored once `pvcs` is set — each of its keys is used as that
+# entry's own PVC name instead.
 nameOverride: ""
-# -- Override the namespace resources are created in (defaults to the release namespace).
+# -- Override the namespace all resources are created in (defaults to the release namespace). Shared across every entry in `pvcs`.
 namespaceOverride: ""
 
-# -- Labels applied to every resource this chart renders, on top of the standard app.kubernetes.io/* labels.
+# -- Labels applied to every resource this chart renders, on top of the standard app.kubernetes.io/* labels. Shared across every entry in `pvcs`.
 commonLabels: {}
-# -- Annotations applied to every resource this chart renders.
+# -- Annotations applied to every resource this chart renders. Shared across every entry in `pvcs`.
 commonAnnotations: {}
+
+# -- Define multiple PVCs (each with its own populate/backup config) in one
+# Helm release, keyed by PVC name. Useful when an app owns several volumes
+# that need different backup treatment — e.g. Plex's `media` (huge,
+# `populate.enabled: false`, no hook) and `config` (small, a live SQLite DB
+# that needs a `beforeSnapshot` hook via `backup.extraSpec`) — but should
+# still ship as one release. Each entry is a *sparse* override with the same
+# shape as the top-level `pvc`/`populate`/`backup` blocks below, deep-merged
+# onto them as shared defaults (set `backup.repository.name` once at the top
+# level rather than in every entry). Leave empty to render a single PVC named
+# `nameOverride` (or the release name) straight from the top-level blocks.
+#
+# pvcs:
+#   media:
+#     pvc:
+#       size: 2Ti
+#     populate:
+#       enabled: false
+#   config:
+#     pvc:
+#       size: 5Gi
+#     backup:
+#       extraSpec:
+#         hooks:
+#           beforeSnapshot:
+#             - command: ["curl", "-fsS", "-X", "POST", "http://plex:32400/..."]
+pvcs: {}
 
 pvc:
   # -- Access modes for the PVC.
@@ -45,8 +74,13 @@ populate:
   offset: 0
   # -- Restore the newest snapshot at or before this RFC3339 timestamp (point-in-time restore). Empty = latest.
   asOf: ""
-  # -- Copy the repository's credential Secret(s) into this namespace for the restore Job. Requires the kopiur controller's features.credentialProjection.enabled=true.
-  credentialProjection: false
+  # -- Copy the repository's credential Secret(s) into this namespace for the
+  # restore Job. Defaults on: a shared ClusterRepository's Secret normally
+  # lives in one namespace (e.g. the kopiur controller's), and this is what
+  # lets a mover in any other namespace read it. Requires the kopiur
+  # controller's features.credentialProjection.enabled=true (a cluster-wide
+  # controller setting — assumed already on; this value has no effect otherwise).
+  credentialProjection: true
   mover:
     # -- Restore-mover UID/GID identity. Defaults to `inheritSecurityContextFrom.snapshot`
     # (the identity kopia RECORDED on the backup itself, `Snapshot.status.recorded`) —
@@ -135,8 +169,10 @@ backup:
   # either). Catches a snapshot that "succeeds" with zero files. {} disables it.
   verification: {}
   credentialProjection:
-    # -- Copy the repository's credential Secret(s) into this namespace for each backup mover Job.
-    enabled: false
+    # -- Copy the repository's credential Secret(s) into this namespace for
+    # each backup mover Job. Defaults on for the same shared-repository reason
+    # as `populate.credentialProjection` above.
+    enabled: true
   # -- Skip future scheduled runs while true (the policy still exists; a manual Snapshot can still be created).
   suspend: false
   schedule:
@@ -170,13 +206,14 @@ argocd:
   # claim exists), then the PVC last (so dataSourceRef has something to claim
   # before the CSI populator races the provisioner). Only matters when these
   # resources sync together in one wave-aware Application; Kustomize's
-  # `helmCharts:` inflator ignores these annotations entirely.
+  # `helmCharts:` inflator ignores these annotations entirely. Shared across
+  # every entry in `pvcs`.
   syncWaves:
     backup: "-2"
     restore: "-1"
     pvc: "0"
-  # -- Add `argocd.argoproj.io/sync-options: Prune=false,Delete=false` to the
-  # PVC so ArgoCD never deletes the live volume — not on a prune (removed from
+  # -- Add `argocd.argoproj.io/sync-options: Prune=false,Delete=false` to every
+  # PVC so ArgoCD never deletes live volumes — not on a prune (removed from
   # git / backup.enabled or populate.enabled toggled off) and not on a
   # cascading Application delete. The single most important GitOps guard for
   # a resource holding data that may not be backed up yet; disable only if you

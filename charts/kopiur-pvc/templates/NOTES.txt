@@ -1,16 +1,25 @@
-kopiur-pvc "{{ include "kopiur-pvc.name" . }}" installed in namespace {{ include "kopiur-pvc.namespace" . }}:
+{{- $ns := include "kopiur-pvc.namespace" . -}}
+{{- $items := fromYaml (include "kopiur-pvc.items" .) }}
+kopiur-pvc release "{{ .Release.Name }}" installed in namespace {{ $ns }}:
+{{- range $pvcName, $override := $items }}
+{{- $override = $override | default dict -}}
+{{- $pvcCfg := mergeOverwrite (deepCopy $.Values.pvc) ($override.pvc | default dict) -}}
+{{- $populateCfg := mergeOverwrite (deepCopy $.Values.populate) ($override.populate | default dict) -}}
+{{- $backupCfg := mergeOverwrite (deepCopy $.Values.backup) ($override.backup | default dict) }}
 
-- PersistentVolumeClaim/{{ include "kopiur-pvc.name" . }} ({{ .Values.pvc.size }}{{ if .Values.pvc.storageClassName }}, storageClass={{ .Values.pvc.storageClassName }}{{ end }})
-{{- if .Values.populate.enabled }}
-- Restore/{{ include "kopiur-pvc.restoreName" . }} (passive populator, onMissingSnapshot={{ .Values.populate.onMissingSnapshot }})
+{{ $pvcName }}:
+  - PersistentVolumeClaim/{{ $pvcName }} ({{ $pvcCfg.size }}{{ if $pvcCfg.storageClassName }}, storageClass={{ $pvcCfg.storageClassName }}{{ end }})
+{{- if $populateCfg.enabled }}
+  - Restore/{{ $pvcName }}-restore (passive populator, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }})
 {{- end }}
-{{- if .Values.backup.enabled }}
-- SnapshotPolicy/{{ include "kopiur-pvc.name" . }} -> {{ .Values.backup.repository.kind }}/{{ .Values.backup.repository.name }}
-{{- if .Values.backup.schedule.cron }}
-- SnapshotSchedule/{{ include "kopiur-pvc.scheduleName" . }} (cron="{{ .Values.backup.schedule.cron }}")
+{{- if $backupCfg.enabled }}
+  - SnapshotPolicy/{{ $pvcName }} -> {{ $backupCfg.repository.kind }}/{{ $backupCfg.repository.name }} (copyMethod={{ $backupCfg.copyMethod }})
+{{- if $backupCfg.schedule.cron }}
+  - SnapshotSchedule/{{ $pvcName }}-schedule (cron="{{ $backupCfg.schedule.cron }}")
 {{- else }}
-- No SnapshotSchedule rendered (backup.schedule.cron is empty) — trigger backups manually or with your own SnapshotSchedule/policySelector.
+  - No SnapshotSchedule rendered (schedule.cron is empty) — trigger backups manually or with your own SnapshotSchedule/policySelector.
 {{- end }}
 {{- else }}
-- backup.enabled=false — no SnapshotPolicy/SnapshotSchedule created; this PVC is not backed up.
+  - backup.enabled=false — no SnapshotPolicy/SnapshotSchedule created; this PVC is not backed up.
+{{- end }}
 {{- end }}
