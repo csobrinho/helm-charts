@@ -68,22 +68,32 @@ helmCharts:
 | `populate.offset` | `0` | 0 = latest snapshot, 1 = previous, ... |
 | `populate.asOf` | `""` | RFC3339 timestamp for point-in-time restore. |
 | `populate.credentialProjection` | `false` | Copy repo credentials into this namespace for the restore Job. |
+| `populate.mover.inheritSecurityContextFrom` | `{snapshot: {}}` | Restore-mover identity. Defaults to the UID/GID kopia *recorded on the backup itself* — the only mode needing no live workload pod, so it works on a freshly rebuilt cluster (exactly what the populator runs before). |
 | `populate.sourcePolicy.name` / `.namespace` | `""` | Restore from a different SnapshotPolicy (defaults to this chart's own policy). |
 | `backup.enabled` | `true` | Render the `SnapshotPolicy` (+ `SnapshotSchedule`). |
 | `backup.repository.kind` / `.name` / `.namespace` | `ClusterRepository` / `s3` / `""` | Repository this PVC backs up to. |
-| `backup.volumeSnapshotClassName` | `""` | VolumeSnapshotClass for the CSI-snapshot copy method. |
+| `backup.copyMethod` | `Direct` | How the source volume is captured before kopia reads it. **Set to `Snapshot`/`Clone` only if your CSI driver's VolumeSnapshot is a real CoW/delta snapshot** (e.g. Ceph RBD/CephFS) — on a driver that full-copies on snapshot (e.g. proxmox-csi), those modes double storage on every scheduled run. `Direct` reads the live volume with no point-in-time guarantee; give a live database its own policy with a `beforeSnapshot` hook via `extraSpec`. |
+| `backup.volumeSnapshotClassName` | `""` | VolumeSnapshotClass; only used when `copyMethod` is `Snapshot`/`Clone`. |
+| `backup.readOnly` | `true` | Mount the source read-only. Leave `true` — flipping it is only meaningful to let a mover `fsGroup` take effect, and under `copyMethod: Direct` that recursively chgrps the **live** volume permanently. Prefer `inheritSecurityContextFrom` below instead. |
+| `backup.acknowledgeLiveMutation` | `false` | Required alongside `readOnly: false` + `copyMethod: Direct` (webhook-enforced); leave `false` unless deliberate. |
+| `backup.inheritSecurityContextFrom` | `{}` | Backup-mover UID/GID identity (`workloadSelector`/`pvcConsumer`/`snapshot`, oneOf). Prefer `workloadSelector` (matches the Deployment's pod template) over `pvcConsumer` (resolves the pod currently mounting the PVC — nothing if scaled to zero when the schedule fires). Requires the workload to pin `runAsUser` explicitly. |
 | `backup.compression` | `{compressor: zstd}` | Kopia compression settings. |
 | `backup.retention` | see `values.yaml` | GFS retention (`keepLatest/Hourly/Daily/Weekly/Monthly/Annual`). |
-| `backup.mover` | `{}` | Per-run mover overrides (resources, cache, securityContext). |
+| `backup.mover` | `{}` | Per-run mover overrides (resources, cache, securityContext) — merged with `inheritSecurityContextFrom` above into one `mover` object. |
+| `backup.errorHandling` | `{}` | e.g. `{ignoreFileErrors: true}`. Leave `{}` (fail loudly) unless a specific error class is deliberately swallowed — it otherwise turns a loud failure into a snapshot quietly missing files. |
+| `backup.verification` | `{}` | e.g. `{quick: {schedule: {cron: "H 3 * * 0"}}, successExpr: "stats.errors == 0 && stats.files > 0"}`. Catches a snapshot that "succeeds" with zero files. |
 | `backup.credentialProjection.enabled` | `false` | Copy repo credentials into this namespace for backup Jobs. |
 | `backup.suspend` | `false` | Pause scheduled runs. |
 | `backup.schedule.cron` | `H 2 * * *` | Cron for the `SnapshotSchedule`; empty renders no schedule. |
 | `backup.schedule.jitter` | `30m` | Deterministic jitter. |
 | `backup.schedule.*` | see `values.yaml` | `runOnCreate`, `timezone`, `suspend`, `concurrencyPolicy`, `startingDeadlineSeconds`. |
-| `backup.extraSpec` | `{}` | Deep-merged into `SnapshotPolicy.spec` (hooks, files, staging, identity, ...). |
+| `backup.extraSpec` | `{}` | Deep-merged into `SnapshotPolicy.spec` (hooks, files, staging, groupBy, identity, ...). |
 | `backup.scheduleExtraSpec` | `{}` | Deep-merged into `SnapshotSchedule.spec`. |
 | `pvcExtraSpec` | `{}` | Deep-merged into the PVC's `spec`. |
 | `restoreExtraSpec` | `{}` | Deep-merged into `Restore.spec`. |
+| `argocd.enabled` | `true` | Stamp ArgoCD sync-wave + deletion-protection annotations (inert outside ArgoCD). |
+| `argocd.syncWaves.backup` / `.restore` / `.pvc` | `-2` / `-1` / `0` | Apply order: SnapshotPolicy/Schedule, then Restore, then the PVC — so the populator claim exists and resolves before the PVC ever binds. |
+| `argocd.protectPvcFromDeletion` | `true` | Adds `argocd.argoproj.io/sync-options: Prune=false,Delete=false` to the PVC so ArgoCD never deletes the live volume on a prune or a cascading Application delete. |
 
 ## Source Code
 

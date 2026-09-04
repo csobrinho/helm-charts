@@ -19,7 +19,14 @@
 {{- if .Values.populate.credentialProjection -}}
 {{- $_ := set $spec "credentialProjection" (dict "enabled" true) -}}
 {{- end -}}
+{{- if .Values.populate.mover -}}
+{{- $_ := set $spec "mover" .Values.populate.mover -}}
+{{- end -}}
 {{- $spec = mergeOverwrite $spec (.Values.restoreExtraSpec | default dict) -}}
+{{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) -}}
+{{- if .Values.argocd.enabled -}}
+{{- $_ := set $annotations "argocd.argoproj.io/sync-wave" (.Values.argocd.syncWaves.restore | toString) -}}
+{{- end -}}
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: Restore
 metadata:
@@ -27,9 +34,9 @@ metadata:
   namespace: {{ $ns }}
   labels:
     {{- include "kopiur-pvc.labels" . | nindent 4 }}
-  {{- with (include "kopiur-pvc.annotations" . | trim) }}
+  {{- if $annotations }}
   annotations:
-    {{- . | nindent 4 }}
+    {{- toYaml $annotations | nindent 4 }}
   {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}

@@ -22,9 +22,3 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
 {{ toYaml . }}
 {{- end }}
 {{- end -}}
-
-{{- define "kopiur-pvc.annotations" -}}
-{{- with .Values.commonAnnotations }}
-{{ toYaml . }}
-{{- end }}
-{{- end -}}

@@ -45,6 +45,15 @@ populate:
   asOf: ""
   # -- Copy the repository's credential Secret(s) into this namespace for the restore Job. Requires the kopiur controller's features.credentialProjection.enabled=true.
   credentialProjection: false
+  mover:
+    # -- Restore-mover UID/GID identity. Defaults to `inheritSecurityContextFrom.snapshot`
+    # (the identity kopia RECORDED on the backup itself, `Snapshot.status.recorded`) —
+    # the only mode that needs no live workload pod, so it works on a freshly
+    # rebuilt cluster and is exactly what `target.populator` runs before. Override
+    # or set to `{}` to fall back to `mover.securityContext`/`podSecurityContext`
+    # (merge those in via `restoreExtraSpec` if needed).
+    inheritSecurityContextFrom:
+      snapshot: {}
   sourcePolicy:
     # -- Name of the SnapshotPolicy to restore from. Empty defaults to the
     # SnapshotPolicy this chart creates (the normal self-restore case). Set
@@ -65,8 +74,36 @@ backup:
     name: s3
     # -- Cross-namespace Repository reference; ignored/forbidden for ClusterRepository.
     namespace: ""
-  # -- VolumeSnapshotClass used for the CSI-snapshot copy method. Empty omits the field (kopiur/CSI default applies).
+  # -- How the source volume is captured before kopia reads it: "Snapshot"
+  # (CRD default), "Direct", or "Clone". IMPORTANT for CSI drivers whose
+  # VolumeSnapshot support full-copies the volume rather than taking a real
+  # delta snapshot (e.g. proxmox-csi): under "Snapshot"/"Clone" every scheduled
+  # backup first full-copies the PVC before kopia reads a byte — not viable at
+  # any real size. Set "Direct" for those drivers; leave "Snapshot" only where
+  # VolumeSnapshot is a genuine CoW/delta snapshot (e.g. Ceph RBD/CephFS).
+  copyMethod: Direct
+  # -- VolumeSnapshotClass used when copyMethod is "Snapshot"/"Clone". Ignored under "Direct". Empty omits the field.
   volumeSnapshotClassName: ""
+  # -- Mount the source read-only (kopia only ever reads it). Leave `true`.
+  # Setting `false` is ONLY meaningful to make a mover `fsGroup` take effect
+  # (the kubelet skips its recursive fsGroup chgrp on a read-only mount) — and
+  # under `copyMethod: Direct` that chgrp walk rewrites the LIVE volume
+  # permanently, while the workload is running. Resolve read access via
+  # `mover.inheritSecurityContextFrom` instead of flipping this.
+  readOnly: true
+  # -- Required acknowledgement to set `readOnly: false` together with
+  # `copyMethod: Direct` (rejected by the webhook otherwise). Leave `false`
+  # unless you have deliberately accepted the live-volume chgrp above.
+  acknowledgeLiveMutation: false
+  # -- Backup-mover UID/GID identity (oneOf `workloadSelector`/`pvcConsumer`/`snapshot`).
+  # Only needed when the source isn't already readable at the mover's default
+  # identity. Prefer `workloadSelector` (resolves against the Deployment's pod
+  # template) over `pvcConsumer` (resolves the pod currently mounting the PVC —
+  # returns nothing if the workload is scaled to zero or mid-rollout when the
+  # schedule fires). Requires the workload to pin `runAsUser` explicitly (a UID
+  # from the image's `USER` line is invisible to Kubernetes and can't be
+  # inherited). Empty = mover's own default identity.
+  inheritSecurityContextFrom: {}
   # -- Kopia compression settings, e.g. {compressor: zstd}. Set to {} to omit.
   compression:
     compressor: zstd
@@ -78,8 +115,21 @@ backup:
     keepWeekly: 4
     keepMonthly: 6
     keepAnnual: 0
-  # -- Per-run mover overrides (resources, cache, securityContext) for backup Jobs. Set to {} to omit.
+  # -- Per-run mover overrides (resources, cache, securityContext) for backup
+  # Jobs — merged with `inheritSecurityContextFrom` above into the same
+  # `mover` object. Set to {} to add nothing beyond that.
   mover: {}
+  # -- Backup-side error handling: let a snapshot complete-with-errors instead
+  # of failing outright (e.g. `{ignoreFileErrors: true}`). Leave {} (fail
+  # loudly) unless you've deliberately chosen to swallow a specific class of
+  # error — `ignoreFileErrors` turns a loud failure into a snapshot quietly
+  # missing files, only discovered at restore time.
+  errorHandling: {}
+  # -- Post-backup verification (e.g. `{quick: {schedule: {cron: "H 3 * * 0"}},
+  # successExpr: "stats.errors == 0 && stats.files > 0"}` — successExpr is a
+  # CEL predicate applying to both the quick and deep tiers, not nested under
+  # either). Catches a snapshot that "succeeds" with zero files. {} disables it.
+  verification: {}
   credentialProjection:
     # -- Copy the repository's credential Secret(s) into this namespace for each backup mover Job.
     enabled: false
@@ -109,3 +159,27 @@ backup:
 pvcExtraSpec: {}
 # -- Escape hatch: extra fields deep-merged into Restore.spec.
 restoreExtraSpec: {}
+
+argocd:
+  # -- Stamp ArgoCD annotations on the rendered resources (sync-wave ordering +
+  # PVC deletion protection). Plain annotations, inert outside ArgoCD, so safe
+  # to leave on even if this isn't (yet) synced by ArgoCD.
+  enabled: true
+  # -- Sync-wave numbers controlling apply order in an ArgoCD-orchestrated sync:
+  # the SnapshotPolicy/SnapshotSchedule first (a Restore resolves the policy's
+  # identity to find its latest snapshot), then the Restore (so its populator
+  # claim exists), then the PVC last (so dataSourceRef has something to claim
+  # before the CSI populator races the provisioner). Only matters when these
+  # resources sync together in one wave-aware Application; Kustomize's
+  # `helmCharts:` inflator ignores these annotations entirely.
+  syncWaves:
+    backup: "-2"
+    restore: "-1"
+    pvc: "0"
+  # -- Add `argocd.argoproj.io/sync-options: Prune=false,Delete=false` to the
+  # PVC so ArgoCD never deletes the live volume — not on a prune (removed from
+  # git / backup.enabled or populate.enabled toggled off) and not on a
+  # cascading Application delete. The single most important GitOps guard for
+  # a resource holding data that may not be backed up yet; disable only if you
+  # want ArgoCD to fully own the PVC's lifecycle.
+  protectPvcFromDeletion: true

@@ -5,7 +5,11 @@
 {{- if .Values.backup.repository.namespace -}}
 {{- $_ := set $repo "namespace" .Values.backup.repository.namespace -}}
 {{- end -}}
-{{- $spec := dict "repository" $repo "sources" (list (dict "pvc" (dict "name" $name))) -}}
+{{- $source := dict "pvc" (dict "name" $name) "readOnly" .Values.backup.readOnly -}}
+{{- if .Values.backup.acknowledgeLiveMutation -}}
+{{- $_ := set $source "acknowledgeLiveMutation" true -}}
+{{- end -}}
+{{- $spec := dict "repository" $repo "sources" (list $source) "copyMethod" .Values.backup.copyMethod -}}
 {{- if .Values.backup.volumeSnapshotClassName -}}
 {{- $_ := set $spec "volumeSnapshotClassName" .Values.backup.volumeSnapshotClassName -}}
 {{- end -}}
@@ -15,8 +19,19 @@
 {{- if .Values.backup.retention -}}
 {{- $_ := set $spec "retention" .Values.backup.retention -}}
 {{- end -}}
-{{- if .Values.backup.mover -}}
-{{- $_ := set $spec "mover" .Values.backup.mover -}}
+{{- $mover := dict -}}
+{{- if .Values.backup.inheritSecurityContextFrom -}}
+{{- $_ := set $mover "inheritSecurityContextFrom" .Values.backup.inheritSecurityContextFrom -}}
+{{- end -}}
+{{- $mover = mergeOverwrite $mover (.Values.backup.mover | default dict) -}}
+{{- if $mover -}}
+{{- $_ := set $spec "mover" $mover -}}
+{{- end -}}
+{{- if .Values.backup.errorHandling -}}
+{{- $_ := set $spec "errorHandling" .Values.backup.errorHandling -}}
+{{- end -}}
+{{- if .Values.backup.verification -}}
+{{- $_ := set $spec "verification" .Values.backup.verification -}}
 {{- end -}}
 {{- if .Values.backup.credentialProjection.enabled -}}
 {{- $_ := set $spec "credentialProjection" .Values.backup.credentialProjection -}}
@@ -25,6 +40,10 @@
 {{- $_ := set $spec "suspend" true -}}
 {{- end -}}
 {{- $spec = mergeOverwrite $spec (.Values.backup.extraSpec | default dict) -}}
+{{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) -}}
+{{- if .Values.argocd.enabled -}}
+{{- $_ := set $annotations "argocd.argoproj.io/sync-wave" (.Values.argocd.syncWaves.backup | toString) -}}
+{{- end -}}
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: SnapshotPolicy
 metadata:
@@ -32,9 +51,9 @@ metadata:
   namespace: {{ $ns }}
   labels:
     {{- include "kopiur-pvc.labels" . | nindent 4 }}
-  {{- with (include "kopiur-pvc.annotations" . | trim) }}
+  {{- if $annotations }}
   annotations:
-    {{- . | nindent 4 }}
+    {{- toYaml $annotations | nindent 4 }}
   {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}

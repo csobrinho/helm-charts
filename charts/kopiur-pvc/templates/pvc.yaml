@@ -12,7 +12,14 @@
 {{- end -}}
 {{- $spec = mergeOverwrite $spec (.Values.pvcExtraSpec | default dict) -}}
 {{- $labels := mergeOverwrite (dict) (fromYaml (include "kopiur-pvc.labels" .)) (.Values.pvc.labels | default dict) -}}
-{{- $annotations := mergeOverwrite (dict) (.Values.commonAnnotations | default dict) (.Values.pvc.annotations | default dict) -}}
+{{- $argoAnnotations := dict -}}
+{{- if .Values.argocd.enabled -}}
+{{- $_ := set $argoAnnotations "argocd.argoproj.io/sync-wave" (.Values.argocd.syncWaves.pvc | toString) -}}
+{{- if .Values.argocd.protectPvcFromDeletion -}}
+{{- $_ := set $argoAnnotations "argocd.argoproj.io/sync-options" "Prune=false,Delete=false" -}}
+{{- end -}}
+{{- end -}}
+{{- $annotations := mergeOverwrite $argoAnnotations (.Values.commonAnnotations | default dict) (.Values.pvc.annotations | default dict) -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
