@@ -6,7 +6,7 @@ description: >-
   backups, and a Restore in passive-populator mode so a new/empty PVC is
   deploy-or-restored from the latest snapshot automatically.
 type: application
-version: 0.1.1
+version: 0.1.2
 # kopiur is v1alpha1 and its CRD surface moves between releases; this chart's
 # field names/shapes were verified against the kopiur v0.10.7 CRDs.
 appVersion: "0.10.7"
