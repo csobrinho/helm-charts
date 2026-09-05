@@ -51,4 +51,8 @@ jobs:
             # rather than failed; core Kubernetes kinds (PVC, etc.) are still
             # fully validated.
             kubeconform -ignore-missing-schemas -summary -output pretty "$rendered"
+
+            if [ -d "$chart_dir/tests" ]; then
+              "$chart_dir/tests/render_test.sh"
+            fi
           done

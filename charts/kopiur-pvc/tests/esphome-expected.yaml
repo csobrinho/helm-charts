@@ -1,0 +1,114 @@
+---
+# Source: kopiur-pvc/templates/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: esphome-config
+  namespace: esphome
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: esphome-config
+    helm.sh/chart: kopiur-pvc-0.1.1
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  accessModes:
+  - ReadWriteOnce
+  dataSourceRef:
+    apiGroup: kopiur.home-operations.com
+    kind: Restore
+    name: esphome-config
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: ceph-block
+  volumeMode: Filesystem
+
+---
+# Source: kopiur-pvc/templates/restore.yaml
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: Restore
+metadata:
+  name: esphome-config
+  namespace: esphome
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: esphome-config
+    helm.sh/chart: kopiur-pvc-0.1.1
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  credentialProjection:
+    enabled: true
+  mover:
+    inheritSecurityContextFrom:
+      snapshot: {}
+  policy:
+    onMissingSnapshot: Continue
+  source:
+    fromPolicy:
+      name: esphome-config
+  target:
+    populator: {}
+
+---
+# Source: kopiur-pvc/templates/snapshotpolicy.yaml
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotPolicy
+metadata:
+  name: esphome-config
+  namespace: esphome
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: esphome-config
+    helm.sh/chart: kopiur-pvc-0.1.1
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  compression:
+    compressor: zstd
+  copyMethod: Direct
+  credentialProjection:
+    enabled: true
+  repository:
+    kind: ClusterRepository
+    name: s3
+  retention:
+    keepAnnual: 0
+    keepDaily: 7
+    keepHourly: 24
+    keepLatest: 3
+    keepMonthly: 6
+    keepWeekly: 4
+  sources:
+  - pvc:
+      name: esphome-config
+    readOnly: true
+  verification:
+    quick:
+      schedule:
+        cron: H 3 * * 0
+        jitter: 30m
+    successExpr: stats.errors == 0 && stats.files > 0
+
+---
+# Source: kopiur-pvc/templates/snapshotschedule.yaml
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: SnapshotSchedule
+metadata:
+  name: esphome-config
+  namespace: esphome
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: esphome-config
+    helm.sh/chart: kopiur-pvc-0.1.1
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  policyRef:
+    name: esphome-config
+  schedule:
+    concurrencyPolicy: Forbid
+    cron: H 2 * * *
+    jitter: 30m

@@ -1,0 +1,14 @@
+# Golden-file render test fixture: a realistic, minimal single-PVC use case
+# (ESPHome's device-config volume). Rendered with `helm template esphome
+# charts/kopiur-pvc --namespace esphome -f this-file`, and the output is
+# checked byte-for-byte against esphome-expected.yaml by tests/render_test.sh
+# (also run by .github/workflows/lint-test.yaml). Everything not set here
+# comes from the chart's own defaults — deliberately, so this test also
+# catches an accidental default change.
+nameOverride: esphome-config
+pvc:
+  size: 2Gi
+  storageClassName: ceph-block
+backup:
+  repository:
+    name: s3

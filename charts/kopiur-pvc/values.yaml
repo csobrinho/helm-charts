@@ -163,11 +163,18 @@ backup:
   # error — `ignoreFileErrors` turns a loud failure into a snapshot quietly
   # missing files, only discovered at restore time.
   errorHandling: {}
-  # -- Post-backup verification (e.g. `{quick: {schedule: {cron: "H 3 * * 0"}},
-  # successExpr: "stats.errors == 0 && stats.files > 0"}` — successExpr is a
-  # CEL predicate applying to both the quick and deep tiers, not nested under
-  # either). Catches a snapshot that "succeeds" with zero files. {} disables it.
-  verification: {}
+  verification:
+    # -- Enable post-backup verification. `enabled` is a chart-only toggle
+    # (stripped before rendering) — everything else here merges verbatim into
+    # the CRD's `verification` object. Defaults to a weekly quick (blob-level)
+    # pass asserting the snapshot isn't a silent zero-file "success"; disable
+    # with `enabled: false` or override `quick`/`deep`/`successExpr` as needed.
+    enabled: true
+    quick:
+      schedule:
+        cron: "H 3 * * 0"
+        jitter: 30m
+    successExpr: "stats.errors == 0 && stats.files > 0"
   credentialProjection:
     # -- Copy the repository's credential Secret(s) into this namespace for
     # each backup mover Job. Defaults on for the same shared-repository reason
