@@ -5,20 +5,72 @@
 # exists and reconciles — not just an object that happens to be present.
 # Applied AFTER the kopiur controller + CRDs are installed, BEFORE `ct install`.
 #
-# Also a StorageClass with volumeBindingMode: Immediate: kind's own default
-# StorageClass uses WaitForFirstConsumer, which never binds a PVC that no pod
-# ever mounts -- and this chart only ever creates the PVC, on purpose, for a
-# separate app chart to consume via existingClaim. `ct install`'s `helm
-# install --wait` would otherwise time out waiting for a PVC that has no
-# reason to bind yet. charts/kopiur-pvc/ci/default-values.yaml points its
-# persistence entry's storageClass at this one.
+# Also a StorageClass + a handful of pre-created static local PersistentVolumes:
+# kind's own default StorageClass (rancher.io/local-path) uses
+# WaitForFirstConsumer, which never binds a PVC that no pod ever mounts --
+# and this chart only ever creates the PVC, on purpose, for a separate app
+# chart to consume via existingClaim. `ct install`'s `helm install --wait`
+# would otherwise time out waiting for a PVC that has no reason to bind yet.
+#
+# Setting volumeBindingMode: Immediate on rancher.io/local-path itself does
+# NOT fix this -- that provisioner needs a scheduled pod to know which node
+# to place the hostPath volume on, so it just fails at provisioning instead
+# ("configuration error, no node was specified") rather than at binding.
+# kubernetes.io/no-provisioner + pre-created static PVs binds immediately
+# with no provisioner and no consuming pod needed: the PV's location is
+# already fixed, so there's nothing for the binder to wait on a pod for.
+# charts/kopiur-pvc/ci/default-values.yaml points its persistence entry's
+# storageClass at this one; the PV's actual hostPath only needs to exist by
+# the time some pod mounts it, which never happens in this test.
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: ci-immediate
-provisioner: rancher.io/local-path
+provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: Immediate
 reclaimPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ci-static-pv-1
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: ci-immediate
+  local:
+    path: /tmp/ci-static-pv-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: Exists
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ci-static-pv-2
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: ci-immediate
+  local:
+    path: /tmp/ci-static-pv-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: Exists
 ---
 apiVersion: v1
 kind: Namespace
