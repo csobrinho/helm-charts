@@ -1,6 +1,6 @@
 # helm-charts
 
-Personal Helm charts, published as OCI artifacts to `oci://ghcr.io/csobrinho/charts/<name>`.
+Personal Helm charts, published as OCI artifacts to `oci://ghcr.io/csobrinho/helm-charts/<name>`.
 
 | Chart | Description |
 |---|---|
