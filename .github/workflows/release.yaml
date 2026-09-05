@@ -39,6 +39,12 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
             --username "${{ github.actor }}" --password-stdin
+          # `helm registry login` writes Helm's own registry config, not the
+          # Docker-style credential store cosign reads -- without this, `cosign
+          # sign` fails pushing the signature with UNAUTHORIZED even though the
+          # helm push right before it succeeded.
+          echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io \
+            --username "${{ github.actor }}" --password-stdin
 
       # On a push event, only the charts whose Chart.yaml actually changed in
       # THIS push (github.event.before -> github.event.after — NOT `ct
