@@ -6,11 +6,16 @@ on:
       - main
     paths:
       - "charts/**"
+      - ".github/ci-fixtures/**"
+      - ".github/workflows/lint-test.yaml"
   push:
     branches:
       - main
     paths:
       - "charts/**"
+      - ".github/ci-fixtures/**"
+      - ".github/workflows/lint-test.yaml"
+  workflow_dispatch: {}
 
 permissions: {}
 
