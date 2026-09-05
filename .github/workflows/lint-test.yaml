@@ -65,6 +65,13 @@ jobs:
       # if present) plus a plain kubeconform pass. Always runs for every
       # chart -- with one or two charts in this repo, that's cheap, and it
       # sidesteps the same push-vs-PR diff-detection problem noted above.
+      #
+      # Renders with charts/<name>/ci/default-values.yaml when present rather
+      # than bare defaults: this chart's own values.yaml intentionally ships
+      # `persistence: {}` (there's no sane universal default PVC size), which
+      # a values.schema.json minProperties check turns into a hard failure on
+      # an unadorned `helm template` -- by design, but it means CI needs a
+      # real values file too, same as any real install would.
       - name: Render tests + kubeconform
         run: |
           set -euo pipefail
@@ -76,8 +83,13 @@ jobs:
               "${chart_dir}tests/render_test.sh"
             fi
 
+            values_args=()
+            if [ -f "${chart_dir}ci/default-values.yaml" ]; then
+              values_args=(-f "${chart_dir}ci/default-values.yaml")
+            fi
+
             rendered="/tmp/${name}-rendered.yaml"
-            helm template "$name" "$chart_dir" --namespace default > "$rendered"
+            helm template "$name" "$chart_dir" --namespace default "${values_args[@]}" > "$rendered"
             # kopiur's kopiur.home-operations.com CRDs (and any other CRD) have no
             # public JSON-schema catalog entry, so their schema lookup is skipped
             # rather than failed; core Kubernetes kinds (PVC, etc.) are still
@@ -87,7 +99,13 @@ jobs:
           done
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1.12.0
+        uses: helm/kind-action@v1.15.0
+        with:
+          # Match the cluster version to what's actually run against this
+          # chart (Kubernetes ~1.37); also kind's own current default, but
+          # pinned explicitly (with digest, per kind's own recommendation) so
+          # a future kind-action bump can't silently change it.
+          node_image: "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 
       # `ct install` needs kopiur's CRDs + controller in the cluster (so the
       # admission webhook can actually accept/reject a SnapshotPolicy/Restore)

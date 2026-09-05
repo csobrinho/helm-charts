@@ -4,12 +4,17 @@
 # runs). populate is disabled here — the dataSourceRef/populator round-trip
 # needs a real cluster and isn't something CI can reliably wait on within a
 # short timeout; verify it manually against the target cluster before relying
-# on it (see the chart README).
-pvc:
-  size: 64Mi
-populate:
-  enabled: false
-backup:
-  repository:
-    kind: ClusterRepository
-    name: ci-test
+# on it (see the chart README). storageClass points at the workflow's
+# "ci-immediate" StorageClass so the PVC actually binds: kind's default
+# StorageClass is WaitForFirstConsumer, which never binds a PVC with no pod
+# mounting it, and `helm install --wait` would otherwise hang until timeout.
+persistence:
+  test:
+    size: 64Mi
+    storageClass: ci-immediate
+    populate:
+      enabled: false
+    backup:
+      repository:
+        kind: ClusterRepository
+        name: ci-test

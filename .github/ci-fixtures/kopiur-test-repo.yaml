@@ -4,6 +4,22 @@
 # charts/kopiur-pvc's SnapshotPolicy can reference a repository that actually
 # exists and reconciles — not just an object that happens to be present.
 # Applied AFTER the kopiur controller + CRDs are installed, BEFORE `ct install`.
+#
+# Also a StorageClass with volumeBindingMode: Immediate: kind's own default
+# StorageClass uses WaitForFirstConsumer, which never binds a PVC that no pod
+# ever mounts -- and this chart only ever creates the PVC, on purpose, for a
+# separate app chart to consume via existingClaim. `ct install`'s `helm
+# install --wait` would otherwise time out waiting for a PVC that has no
+# reason to bind yet. charts/kopiur-pvc/ci/default-values.yaml points its
+# persistence entry's storageClass at this one.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ci-immediate
+provisioner: rancher.io/local-path
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+---
 apiVersion: v1
 kind: Namespace
 metadata:

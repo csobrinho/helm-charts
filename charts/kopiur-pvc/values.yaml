@@ -1,62 +1,49 @@
 ---
 # yaml-language-server: $schema=values.schema.json
 
-# -- Name of the single PVC when `pvcs` (below) is left empty (defaults to the
-# release name). Ignored once `pvcs` is set — each of its keys is used as that
-# entry's own PVC name instead.
-nameOverride: ""
-# -- Override the namespace all resources are created in (defaults to the release namespace). Shared across every entry in `pvcs`.
+# -- Override the namespace all resources are created in (defaults to the release namespace). Shared across every entry in `persistence`.
 namespaceOverride: ""
 
-# -- Labels applied to every resource this chart renders, on top of the standard app.kubernetes.io/* labels. Shared across every entry in `pvcs`.
+# -- Labels applied to every resource this chart renders, on top of the standard app.kubernetes.io/* labels. Shared across every entry in `persistence`.
 commonLabels: {}
-# -- Annotations applied to every resource this chart renders. Shared across every entry in `pvcs`.
+# -- Annotations applied to every resource this chart renders. Shared across every entry in `persistence`.
 commonAnnotations: {}
 
-# -- Define multiple PVCs (each with its own populate/backup config) in one
-# Helm release, keyed by PVC name. Useful when an app owns several volumes
-# that need different backup treatment — e.g. Plex's `media` (huge,
-# `populate.enabled: false`, no hook) and `config` (small, a live SQLite DB
-# that needs a `beforeSnapshot` hook via `backup.extraSpec`) — but should
-# still ship as one release. Each entry is a *sparse* override with the same
-# shape as the top-level `pvc`/`populate`/`backup` blocks below, deep-merged
-# onto them as shared defaults (set `backup.repository.name` once at the top
-# level rather than in every entry). Leave empty to render a single PVC named
-# `nameOverride` (or the release name) straight from the top-level blocks.
+# -- One PVC per entry, keyed by PVC name — same field naming as bjw-s-labs
+# app-template's / TrueCharts' `persistence` block (`size`, `storageClass`,
+# `accessMode`, `retain`, ...). There is no single-PVC mode: `persistence` is
+# the only way to get a PVC out of this chart, and it must have at least one
+# entry — empty by default, deliberately: there's no sane universal default
+# size, and (learned the hard way) baking in an example entry here means it
+# always renders ALONGSIDE whatever a caller adds under a different key,
+# since Helm's values-merge only fills in an entry's fields when the caller
+# reuses the exact same key name.
 #
-# pvcs:
+# Per entry: `size` is required; everything else (labels/annotations/
+# extraSpec/accessMode/volumeMode/retain, and `populate`/`backup`) is
+# optional and falls back to this chart's own built-in defaults (accessMode
+# ReadWriteOnce, volumeMode Filesystem, retain false, and the `populate:`/
+# `backup:` blocks further down, each entry's populate/backup sparse-
+# overriding those).
+#
+# persistence:
 #   media:
-#     pvc:
-#       size: 2Ti
+#     size: 2Ti
+#     storageClass: ceph-block
 #     populate:
-#       enabled: false
+#       enabled: false   # too large to deploy-or-restore; backup-only
 #   config:
-#     pvc:
-#       size: 5Gi
+#     size: 5Gi
+#     storageClass: ceph-block
+#     retain: true       # helm.sh/resource-policy: keep — survives `helm uninstall`
 #     backup:
 #       extraSpec:
 #         hooks:
 #           beforeSnapshot:
 #             - command: ["curl", "-fsS", "-X", "POST", "http://plex:32400/..."]
-pvcs: {}
+persistence: {}
 
-pvc:
-  # -- Access modes for the PVC.
-  accessModes:
-    - ReadWriteOnce
-  # -- Requested size of the PVC (e.g. "10Gi").
-  size: 10Gi
-  # -- StorageClass for the PVC; empty uses the cluster default StorageClass.
-  storageClassName: ""
-  # -- volumeMode for the PVC: Filesystem or Block.
-  volumeMode: Filesystem
-  # -- Extra labels for the PVC only.
-  labels: {}
-  # -- Extra annotations for the PVC only.
-  annotations: {}
-  # -- Escape hatch: extra fields deep-merged into the PersistentVolumeClaim.spec.
-  extraSpec: {}
-
+# -- Defaults for every `persistence.<name>.populate` (sparse-overridden per entry).
 populate:
   # -- Wire the PVC's spec.dataSourceRef to a kopiur Restore in passive-populator
   # mode, so a brand-new/empty PVC is deploy-or-restored from the backup
@@ -101,6 +88,7 @@ populate:
   # -- Escape hatch: extra fields deep-merged into Restore.spec.
   extraSpec: {}
 
+# -- Defaults for every `persistence.<name>.backup` (sparse-overridden per entry).
 backup:
   # -- Create a SnapshotPolicy (and, when schedule.cron is set, a
   # SnapshotSchedule) that backs up this PVC to a kopiur repository.
@@ -214,7 +202,7 @@ argocd:
   # before the CSI populator races the provisioner). Only matters when these
   # resources sync together in one wave-aware Application; Kustomize's
   # `helmCharts:` inflator ignores these annotations entirely. Shared across
-  # every entry in `pvcs`.
+  # every entry in `persistence`.
   syncWaves:
     backup: "-2"
     restore: "-1"

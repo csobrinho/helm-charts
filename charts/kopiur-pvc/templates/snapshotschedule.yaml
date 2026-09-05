@@ -1,9 +1,8 @@
 {{- $ns := include "kopiur-pvc.namespace" . -}}
-{{- $items := fromYaml (include "kopiur-pvc.items" .) -}}
-{{- range $pvcName, $override := $items }}
-{{- $override = $override | default dict -}}
-{{- $backupCfg := mergeOverwrite (deepCopy $.Values.backup) ($override.backup | default dict) -}}
-{{- if and $backupCfg.enabled $backupCfg.schedule $backupCfg.schedule.cron }}
+{{- range $pvcName, $entry := .Values.persistence }}
+{{- $entry = mergeOverwrite (fromYaml (include "kopiur-pvc.entryDefaults" $)) $entry -}}
+{{- $backupCfg := mergeOverwrite (deepCopy $.Values.backup) ($entry.backup | default dict) -}}
+{{- if and $entry.enabled $backupCfg.enabled $backupCfg.schedule $backupCfg.schedule.cron }}
 {{- $schedule := dict "cron" $backupCfg.schedule.cron -}}
 {{- if $backupCfg.schedule.jitter -}}{{- $_ := set $schedule "jitter" $backupCfg.schedule.jitter -}}{{- end -}}
 {{- if $backupCfg.schedule.timezone -}}{{- $_ := set $schedule "timezone" $backupCfg.schedule.timezone -}}{{- end -}}
@@ -33,5 +32,5 @@ metadata:
   {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}
-{{- end }}
+{{ end }}
 {{- end }}

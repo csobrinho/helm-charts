@@ -1,22 +1,21 @@
 {{- $ns := include "kopiur-pvc.namespace" . -}}
-{{- $items := fromYaml (include "kopiur-pvc.items" .) -}}
-{{- range $pvcName, $override := $items }}
-{{- $override = $override | default dict -}}
-{{- $pvcCfg := mergeOverwrite (deepCopy $.Values.pvc) ($override.pvc | default dict) -}}
-{{- $populateCfg := mergeOverwrite (deepCopy $.Values.populate) ($override.populate | default dict) -}}
-{{- $spec := dict "accessModes" $pvcCfg.accessModes "resources" (dict "requests" (dict "storage" $pvcCfg.size)) -}}
-{{- if $pvcCfg.storageClassName -}}
-{{- $_ := set $spec "storageClassName" $pvcCfg.storageClassName -}}
+{{- range $pvcName, $entry := .Values.persistence }}
+{{- $entry = mergeOverwrite (fromYaml (include "kopiur-pvc.entryDefaults" $)) $entry -}}
+{{- if $entry.enabled }}
+{{- $spec := dict "accessModes" (list $entry.accessMode) "resources" (dict "requests" (dict "storage" $entry.size)) -}}
+{{- if $entry.storageClass -}}
+{{- $_ := set $spec "storageClassName" $entry.storageClass -}}
 {{- end -}}
-{{- if $pvcCfg.volumeMode -}}
-{{- $_ := set $spec "volumeMode" $pvcCfg.volumeMode -}}
+{{- if $entry.volumeMode -}}
+{{- $_ := set $spec "volumeMode" $entry.volumeMode -}}
 {{- end -}}
+{{- $populateCfg := mergeOverwrite (deepCopy $.Values.populate) ($entry.populate | default dict) -}}
 {{- if $populateCfg.enabled -}}
 {{- $_ := set $spec "dataSourceRef" (dict "apiGroup" "kopiur.home-operations.com" "kind" "Restore" "name" $pvcName) -}}
 {{- end -}}
-{{- $spec = mergeOverwrite $spec ($pvcCfg.extraSpec | default dict) -}}
+{{- $spec = mergeOverwrite $spec ($entry.extraSpec | default dict) -}}
 {{- $labels := mergeOverwrite (dict "app.kubernetes.io/name" $pvcName) (fromYaml (include "kopiur-pvc.labels" $)) -}}
-{{- $labels = mergeOverwrite $labels ($pvcCfg.labels | default dict) -}}
+{{- $labels = mergeOverwrite $labels ($entry.labels | default dict) -}}
 {{- $argoAnnotations := dict -}}
 {{- if $.Values.argocd.enabled -}}
 {{- $_ := set $argoAnnotations "argocd.argoproj.io/sync-wave" ($.Values.argocd.syncWaves.pvc | toString) -}}
@@ -24,7 +23,10 @@
 {{- $_ := set $argoAnnotations "argocd.argoproj.io/sync-options" "Prune=false,Delete=false" -}}
 {{- end -}}
 {{- end -}}
-{{- $annotations := mergeOverwrite $argoAnnotations ($.Values.commonAnnotations | default dict) ($pvcCfg.annotations | default dict) -}}
+{{- if $entry.retain -}}
+{{- $_ := set $argoAnnotations "helm.sh/resource-policy" "keep" -}}
+{{- end -}}
+{{- $annotations := mergeOverwrite $argoAnnotations ($.Values.commonAnnotations | default dict) ($entry.annotations | default dict) -}}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -39,4 +41,5 @@ metadata:
   {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}
+{{ end }}
 {{- end }}

@@ -1,14 +1,16 @@
-{{- $ns := include "kopiur-pvc.namespace" . -}}
-{{- $items := fromYaml (include "kopiur-pvc.items" .) }}
+{{- $ns := include "kopiur-pvc.namespace" . }}
 kopiur-pvc release "{{ .Release.Name }}" installed in namespace {{ $ns }}:
-{{- range $pvcName, $override := $items }}
-{{- $override = $override | default dict -}}
-{{- $pvcCfg := mergeOverwrite (deepCopy $.Values.pvc) ($override.pvc | default dict) -}}
-{{- $populateCfg := mergeOverwrite (deepCopy $.Values.populate) ($override.populate | default dict) -}}
-{{- $backupCfg := mergeOverwrite (deepCopy $.Values.backup) ($override.backup | default dict) }}
+{{- range $pvcName, $entry := .Values.persistence }}
+{{- $entry = mergeOverwrite (fromYaml (include "kopiur-pvc.entryDefaults" $)) $entry -}}
+{{- if not $entry.enabled }}
+
+{{ $pvcName }}: disabled (persistence.{{ $pvcName }}.enabled=false)
+{{- else }}
+{{- $populateCfg := mergeOverwrite (deepCopy $.Values.populate) ($entry.populate | default dict) }}
+{{- $backupCfg := mergeOverwrite (deepCopy $.Values.backup) ($entry.backup | default dict) }}
 
 {{ $pvcName }}:
-  - PersistentVolumeClaim/{{ $pvcName }} ({{ $pvcCfg.size }}{{ if $pvcCfg.storageClassName }}, storageClass={{ $pvcCfg.storageClassName }}{{ end }})
+  - PersistentVolumeClaim/{{ $pvcName }} ({{ $entry.size }}{{ if $entry.storageClass }}, storageClass={{ $entry.storageClass }}{{ end }})
 {{- if $populateCfg.enabled }}
   - Restore/{{ $pvcName }} (passive populator, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }})
 {{- end }}
@@ -21,5 +23,6 @@ kopiur-pvc release "{{ .Release.Name }}" installed in namespace {{ $ns }}:
 {{- end }}
 {{- else }}
   - backup.enabled=false — no SnapshotPolicy/SnapshotSchedule created; this PVC is not backed up.
+{{- end }}
 {{- end }}
 {{- end }}

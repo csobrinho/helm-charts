@@ -4,29 +4,6 @@
   "type": "object",
   "additionalProperties": false,
   "definitions": {
-    "pvc": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "accessModes": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string",
-            "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"]
-          }
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$"
-        },
-        "storageClassName": { "type": "string" },
-        "volumeMode": { "type": "string", "enum": ["Filesystem", "Block"] },
-        "labels": { "type": "object" },
-        "annotations": { "type": "object" },
-        "extraSpec": { "type": "object" }
-      }
-    },
     "populate": {
       "type": "object",
       "additionalProperties": false,
@@ -111,29 +88,40 @@
     }
   },
   "properties": {
-    "nameOverride": { "type": "string" },
     "namespaceOverride": { "type": "string" },
     "commonLabels": { "type": "object" },
     "commonAnnotations": { "type": "object" },
 
-    "pvcs": {
+    "persistence": {
       "type": "object",
-      "description": "Sparse per-PVC overrides, keyed by PVC name, deep-merged onto the top-level pvc/populate/backup defaults.",
+      "minProperties": 1,
+      "description": "One PVC per entry, keyed by PVC name (bjw-s-labs app-template / TrueCharts persistence naming). Required — at least one entry. populate/backup here sparse-override the top-level populate:/backup: defaults.",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
+        "required": ["size"],
         "properties": {
-          "pvc": { "$ref": "#/definitions/pvc" },
+          "enabled": { "type": "boolean" },
+          "size": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$"
+          },
+          "storageClass": { "type": "string" },
+          "accessMode": {
+            "type": "string",
+            "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany", "ReadWriteOncePod"]
+          },
+          "volumeMode": { "type": "string", "enum": ["Filesystem", "Block"] },
+          "retain": { "type": "boolean" },
+          "labels": { "type": "object" },
+          "annotations": { "type": "object" },
+          "extraSpec": { "type": "object" },
           "populate": { "$ref": "#/definitions/populate" },
           "backup": { "$ref": "#/definitions/backup" }
         }
       }
     },
 
-    "pvc": {
-      "allOf": [{ "$ref": "#/definitions/pvc" }],
-      "required": ["accessModes", "size"]
-    },
     "populate": {
       "allOf": [{ "$ref": "#/definitions/populate" }],
       "required": ["enabled", "onMissingSnapshot"]
@@ -161,5 +149,6 @@
         "protectPvcFromDeletion": { "type": "boolean" }
       }
     }
-  }
+  },
+  "required": ["persistence", "populate", "backup"]
 }

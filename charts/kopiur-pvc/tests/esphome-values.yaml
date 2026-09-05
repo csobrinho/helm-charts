@@ -5,10 +5,10 @@
 # (also run by .github/workflows/lint-test.yaml). Everything not set here
 # comes from the chart's own defaults — deliberately, so this test also
 # catches an accidental default change.
-nameOverride: esphome-config
-pvc:
-  size: 2Gi
-  storageClassName: ceph-block
-backup:
-  repository:
-    name: s3
+persistence:
+  esphome-config:
+    size: 2Gi
+    storageClass: ceph-block
+    backup:
+      repository:
+        name: s3

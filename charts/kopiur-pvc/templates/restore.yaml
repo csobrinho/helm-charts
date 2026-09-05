@@ -1,9 +1,8 @@
 {{- $ns := include "kopiur-pvc.namespace" . -}}
-{{- $items := fromYaml (include "kopiur-pvc.items" .) -}}
-{{- range $pvcName, $override := $items }}
-{{- $override = $override | default dict -}}
-{{- $populateCfg := mergeOverwrite (deepCopy $.Values.populate) ($override.populate | default dict) -}}
-{{- if $populateCfg.enabled }}
+{{- range $pvcName, $entry := .Values.persistence }}
+{{- $entry = mergeOverwrite (fromYaml (include "kopiur-pvc.entryDefaults" $)) $entry -}}
+{{- $populateCfg := mergeOverwrite (deepCopy $.Values.populate) ($entry.populate | default dict) -}}
+{{- if and $entry.enabled $populateCfg.enabled }}
 {{- $policyRef := dict "name" ($populateCfg.sourcePolicy.name | default $pvcName) -}}
 {{- if $populateCfg.sourcePolicy.namespace -}}
 {{- $_ := set $policyRef "namespace" $populateCfg.sourcePolicy.namespace -}}
@@ -46,5 +45,5 @@ metadata:
   {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}
-{{- end }}
+{{ end }}
 {{- end }}
