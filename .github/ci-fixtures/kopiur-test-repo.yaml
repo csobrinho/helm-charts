@@ -1,0 +1,109 @@
+# Test fixtures for `ct install` in .github/workflows/lint-test.yaml: an
+# in-cluster MinIO (so the "install" job needs no external network access or
+# secrets) plus a real ClusterRepository named "ci-test" pointing at it, so
+# charts/kopiur-pvc's SnapshotPolicy can reference a repository that actually
+# exists and reconciles — not just an object that happens to be present.
+# Applied AFTER the kopiur controller + CRDs are installed, BEFORE `ct install`.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          args: ["server", "/data"]
+          env:
+            - name: MINIO_ROOT_USER
+              value: kopiur-ci
+            - name: MINIO_ROOT_PASSWORD
+              value: kopiur-ci-password
+          ports:
+            - containerPort: 9000
+          readinessProbe:
+            tcpSocket:
+              port: 9000
+            initialDelaySeconds: 2
+            periodSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: minio
+spec:
+  selector:
+    app: minio
+  ports:
+    - port: 9000
+      targetPort: 9000
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-make-bucket
+  namespace: minio
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:latest
+          command:
+            - sh
+            - -c
+            - |
+              mc alias set ci http://minio.minio.svc.cluster.local:9000 kopiur-ci kopiur-ci-password &&
+              mc mb --ignore-existing ci/kopiur-ci
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kopiur-ci-secret
+  namespace: kopiur-system
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: kopiur-ci
+  AWS_SECRET_ACCESS_KEY: kopiur-ci-password
+  KOPIA_PASSWORD: kopiur-ci-repository-password
+---
+apiVersion: kopiur.home-operations.com/v1alpha1
+kind: ClusterRepository
+metadata:
+  name: ci-test
+spec:
+  allowedNamespaces:
+    all: true
+  backend:
+    s3:
+      bucket: kopiur-ci
+      endpoint: minio.minio.svc.cluster.local:9000
+      region: us-east-1
+      auth:
+        secretRef:
+          name: kopiur-ci-secret
+          namespace: kopiur-system
+      tls:
+        disableTls: true
+  encryption:
+    passwordSecretRef:
+      name: kopiur-ci-secret
+      namespace: kopiur-system
+      key: KOPIA_PASSWORD

@@ -12,47 +12,112 @@ on:
     paths:
       - "charts/**"
 
+permissions: {}
+
 jobs:
   lint-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup Helm
         uses: azure/setup-helm@v5
         with:
           version: "4.2.4"
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+          check-latest: true
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.8.0
+
+      - name: Run chart-testing (list-changed)
+        id: list-changed
+        run: |
+          changed=$(ct list-changed --target-branch ${{ github.event.repository.default_branch }})
+          if [[ -n "$changed" ]]; then
+            echo "has_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          {
+            echo "changed<<CHANGED_EOF"
+            echo "$changed"
+            echo "CHANGED_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run chart-testing (lint)
+        if: steps.list-changed.outputs.has_changed == 'true'
+        run: ct lint --target-branch ${{ github.event.repository.default_branch }} --validate-maintainers=false
+
       - name: Install kubeconform
+        if: steps.list-changed.outputs.has_changed == 'true'
         run: |
           wget -q https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
           tar xf kubeconform-linux-amd64.tar.gz
           sudo mv kubeconform /usr/local/bin/
 
-      - name: Lint, template & validate every chart
+      # Renders and validates every changed chart's own golden-file render
+      # tests (charts/<name>/tests/render_test.sh, if present) plus a plain
+      # kubeconform pass. `ct lint` above already covers `helm lint` +
+      # `values.schema.json` + chart-testing's own yamllint/maintainer checks;
+      # this step is the chart-specific stuff on top of that.
+      - name: Render tests + kubeconform
+        if: steps.list-changed.outputs.has_changed == 'true'
         run: |
           set -euo pipefail
-
-          for chart_dir in charts/*/; do
+          for chart_dir in ${{ steps.list-changed.outputs.changed }}; do
             name="$(basename "$chart_dir")"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "🔍 ${name}"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "::group::${name}"
 
-            helm lint "$chart_dir"
+            if [ -x "$chart_dir/tests/render_test.sh" ]; then
+              "$chart_dir/tests/render_test.sh"
+            fi
 
             rendered="/tmp/${name}-rendered.yaml"
             helm template "$name" "$chart_dir" --namespace default > "$rendered"
-
             # kopiur's kopiur.home-operations.com CRDs (and any other CRD) have no
             # public JSON-schema catalog entry, so their schema lookup is skipped
             # rather than failed; core Kubernetes kinds (PVC, etc.) are still
             # fully validated.
             kubeconform -ignore-missing-schemas -summary -output pretty "$rendered"
-
-            if [ -d "$chart_dir/tests" ]; then
-              "$chart_dir/tests/render_test.sh"
-            fi
+            echo "::endgroup::"
           done
+
+      - name: Create kind cluster
+        if: steps.list-changed.outputs.has_changed == 'true'
+        uses: helm/kind-action@v1.12.0
+
+      # `ct install` needs kopiur's CRDs + controller in the cluster (so the
+      # admission webhook can actually accept/reject a SnapshotPolicy/Restore)
+      # and a real repository for backup.repository.name in
+      # charts/kopiur-pvc/ci/default-values.yaml to resolve against — an
+      # in-cluster MinIO stands in for that. `populate.enabled: false` in that
+      # ci/ values file means the dataSourceRef/populator round-trip itself is
+      # NOT exercised here (it needs a longer-running real cluster to wait on
+      # reliably); verify that manually against the target cluster before
+      # relying on it, per each chart's README.
+      - name: Install kopiur controller + CRDs
+        if: steps.list-changed.outputs.has_changed == 'true'
+        run: |
+          helm install kopiur oci://ghcr.io/home-operations/charts/kopiur \
+            --namespace kopiur-system --create-namespace \
+            --wait --timeout 5m
+
+      - name: Bootstrap test repository (MinIO + ClusterRepository)
+        if: steps.list-changed.outputs.has_changed == 'true'
+        run: |
+          kubectl apply -f .github/ci-fixtures/kopiur-test-repo.yaml
+          kubectl -n minio wait --for=condition=Available --timeout=120s deployment/minio
+          kubectl -n minio wait --for=condition=Complete --timeout=120s job/minio-make-bucket
+          kubectl wait --for=jsonpath='{.status.phase}'=Ready --timeout=120s clusterrepository/ci-test
+
+      - name: Run chart-testing (install)
+        if: steps.list-changed.outputs.has_changed == 'true'
+        run: ct install --target-branch ${{ github.event.repository.default_branch }}

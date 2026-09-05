@@ -11,6 +11,8 @@ on:
 permissions:
   contents: read
   packages: write
+  # For cosign keyless signing (Sigstore Fulcio/Rekor via GitHub's OIDC token).
+  id-token: write
 
 env:
   OCI_REPO: ghcr.io/${{ github.repository_owner }}/helm-charts
@@ -22,28 +24,50 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup Helm
         uses: azure/setup-helm@v5
         with:
           version: "4.2.4"
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
       - name: Login to GHCR
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
             --username "${{ github.actor }}" --password-stdin
 
-      # Each chart under charts/<name> is pushed to oci://ghcr.io/<owner>/helm-charts/<name>.
-      # A chart's version (Chart.yaml) must be bumped for a change to publish — an
-      # unchanged version is skipped (idempotent, and OCI registries refuse to
-      # overwrite an existing tag anyway).
-      - name: Package & push changed charts
+      # On a push event, only the charts whose Chart.yaml actually changed in
+      # THIS push (github.event.before -> github.event.after — NOT `ct
+      # list-changed --target-branch main`, which diffs against origin/main
+      # and would compare main against itself here, always empty) are
+      # candidates. workflow_dispatch has no before/after to diff, so it
+      # falls back to every chart. Either way, "already published" (below)
+      # is the real safety net: a chart is only ever packaged/pushed/signed
+      # once for a given version, however it was selected.
+      - name: Package, push & sign changed charts
         run: |
           set -euo pipefail
           mkdir -p /tmp/dist
 
-          for chart_yaml in charts/*/Chart.yaml; do
-            chart_dir="$(dirname "$chart_yaml")"
+          before='${{ github.event.before }}'
+          if [[ "${{ github.event_name }}" == "push" && "$before" != "0000000000000000000000000000000000000000" ]]; then
+            chart_dirs="$(git diff --name-only "$before" '${{ github.event.after }}' \
+              -- 'charts/*/Chart.yaml' | xargs -r -n1 dirname | sort -u)"
+          else
+            chart_dirs="$(dirname charts/*/Chart.yaml)"
+          fi
+
+          if [[ -z "$chart_dirs" ]]; then
+            echo "No changed Chart.yaml files, nothing to publish."
+            exit 0
+          fi
+
+          for chart_dir in $chart_dirs; do
+            chart_yaml="$chart_dir/Chart.yaml"
             name="$(yq -r '.name' "$chart_yaml")"
             version="$(yq -r '.version' "$chart_yaml")"
             ref="oci://${OCI_REPO}/${name}"
@@ -55,5 +79,9 @@ jobs:
 
             echo "Publishing ${name}-${version} to ${ref}"
             helm package "$chart_dir" -d /tmp/dist
-            helm push "/tmp/dist/${name}-${version}.tgz" "oci://${OCI_REPO}"
+            push_output="$(helm push "/tmp/dist/${name}-${version}.tgz" "oci://${OCI_REPO}" 2>&1 | tee /dev/stderr)"
+            digest="$(echo "$push_output" | grep -oP 'Digest: \Ksha256:[0-9a-f]+')"
+
+            echo "Signing ${OCI_REPO}/${name}@${digest}"
+            cosign sign --yes "${OCI_REPO}/${name}@${digest}"
           done
