@@ -1,41 +1,13 @@
 ---
-# Source: kopiur-pvc/templates/pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: esphome-config
-  namespace: esphome
-  labels:
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: esphome-config
-    helm.sh/chart: kopiur-pvc-0.1.4
-  annotations:
-    argocd.argoproj.io/sync-options: Prune=false,Delete=false
-    argocd.argoproj.io/sync-wave: "0"
-spec:
-  accessModes:
-  - ReadWriteOnce
-  dataSourceRef:
-    apiGroup: kopiur.home-operations.com
-    kind: Restore
-    name: esphome-config
-  resources:
-    requests:
-      storage: 2Gi
-  storageClassName: ceph-block
-  volumeMode: Filesystem
-
-
----
 # Source: kopiur-pvc/templates/restore.yaml
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: Restore
 metadata:
-  name: esphome-config
-  namespace: esphome
+  name: esphome-config-manual
+  namespace: existingclaim
   labels:
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: esphome-config
+    app.kubernetes.io/name: esphome-config-manual
     helm.sh/chart: kopiur-pvc-0.1.4
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
@@ -49,9 +21,10 @@ spec:
     onMissingSnapshot: Continue
   source:
     fromPolicy:
-      name: esphome-config
+      name: esphome-config-manual
   target:
-    populator: {}
+    pvcRef:
+      name: esphome-config-manual
 
 
 ---
@@ -59,11 +32,11 @@ spec:
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: SnapshotPolicy
 metadata:
-  name: esphome-config
-  namespace: esphome
+  name: esphome-config-manual
+  namespace: existingclaim
   labels:
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: esphome-config
+    app.kubernetes.io/name: esphome-config-manual
     helm.sh/chart: kopiur-pvc-0.1.4
   annotations:
     argocd.argoproj.io/sync-wave: "-2"
@@ -85,7 +58,7 @@ spec:
     keepWeekly: 4
   sources:
   - pvc:
-      name: esphome-config
+      name: esphome-config-manual
     readOnly: true
   verification:
     quick:
@@ -100,17 +73,17 @@ spec:
 apiVersion: kopiur.home-operations.com/v1alpha1
 kind: SnapshotSchedule
 metadata:
-  name: esphome-config
-  namespace: esphome
+  name: esphome-config-manual
+  namespace: existingclaim
   labels:
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: esphome-config
+    app.kubernetes.io/name: esphome-config-manual
     helm.sh/chart: kopiur-pvc-0.1.4
   annotations:
     argocd.argoproj.io/sync-wave: "-2"
 spec:
   policyRef:
-    name: esphome-config
+    name: esphome-config-manual
   schedule:
     concurrencyPolicy: Forbid
     cron: H 2 * * *

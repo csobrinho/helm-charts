@@ -1,0 +1,6 @@
+persistence:
+  esphome-config-manual:
+    existingClaim: true
+    backup:
+      repository:
+        name: primary

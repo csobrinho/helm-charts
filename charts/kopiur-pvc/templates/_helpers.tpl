@@ -15,6 +15,7 @@ what we want (cluster default).
 */}}
 {{- define "kopiur-pvc.entryDefaults" -}}
 enabled: true
+existingClaim: false
 accessMode: ReadWriteOnce
 volumeMode: Filesystem
 retain: false

@@ -11,8 +11,10 @@ commonAnnotations: {}
 
 # -- One PVC per entry, keyed by PVC name — same field naming as bjw-s-labs
 # app-template's / TrueCharts' `persistence` block (`size`, `storageClass`,
-# `accessMode`, `retain`, ...). Required — at least one entry. Only `size` is
-# required per entry; everything else falls back to defaults (see
+# `accessMode`, `retain`, ...). Required — at least one entry. Each entry needs
+# either `size` (this chart creates the PVC) or `existingClaim: true` (it
+# doesn't — the entry's key is taken as the name of a PVC that already exists;
+# see below); everything else falls back to defaults (see
 # templates/_helpers.tpl's `kopiur-pvc.entryDefaults`, and the `populate:`/
 # `backup:` blocks below, which each entry sparse-overrides).
 #
@@ -31,6 +33,8 @@ commonAnnotations: {}
 #         hooks:
 #           beforeSnapshot:
 #             - command: ["curl", "-fsS", "-X", "POST", "http://plex:32400/..."]
+#   already-provisioned:                       # PVC name = the manually-created PVC's own name
+#     existingClaim: true   # no PVC rendered; Restore/SnapshotPolicy/SnapshotSchedule still are, targeting it directly (Restore uses target.pvcRef, not a dataSourceRef populator)
 persistence: {}
 
 # -- Defaults for every `persistence.<name>.populate` (sparse-overridden per entry).
@@ -87,7 +91,7 @@ backup:
     # -- Which repository CRD this points at: "Repository" or "ClusterRepository".
     kind: ClusterRepository
     # -- Name of the referenced Repository/ClusterRepository.
-    name: s3
+    name: primary
     # -- Cross-namespace Repository reference; ignored/forbidden for ClusterRepository.
     namespace: ""
   # -- How the source volume is captured before kopia reads it: "Snapshot"

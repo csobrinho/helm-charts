@@ -11,4 +11,4 @@ persistence:
     storageClass: ceph-block
     backup:
       repository:
-        name: s3
+        name: primary

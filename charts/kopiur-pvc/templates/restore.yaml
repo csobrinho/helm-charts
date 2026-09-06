@@ -17,7 +17,11 @@
 {{- if $populateCfg.waitTimeout -}}
 {{- $_ := set $policy "waitTimeout" $populateCfg.waitTimeout -}}
 {{- end -}}
-{{- $spec := dict "source" (dict "fromPolicy" $policyRef) "target" (dict "populator" dict) "policy" $policy -}}
+{{- $target := dict "populator" dict -}}
+{{- if $entry.existingClaim -}}
+{{- $target = dict "pvcRef" (dict "name" $pvcName) -}}
+{{- end -}}
+{{- $spec := dict "source" (dict "fromPolicy" $policyRef) "target" $target "policy" $policy -}}
 {{- if $populateCfg.credentialProjection -}}
 {{- $_ := set $spec "credentialProjection" (dict "enabled" true) -}}
 {{- end -}}

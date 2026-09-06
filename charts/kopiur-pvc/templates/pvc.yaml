@@ -1,7 +1,7 @@
 {{- $ns := include "kopiur-pvc.namespace" . -}}
 {{- range $pvcName, $entry := .Values.persistence }}
 {{- $entry = mergeOverwrite (fromYaml (include "kopiur-pvc.entryDefaults" $)) $entry -}}
-{{- if $entry.enabled }}
+{{- if and $entry.enabled (not $entry.existingClaim) }}
 {{- $spec := dict "accessModes" (list $entry.accessMode) "resources" (dict "requests" (dict "storage" $entry.size)) -}}
 {{- if $entry.storageClass -}}
 {{- $_ := set $spec "storageClassName" $entry.storageClass -}}

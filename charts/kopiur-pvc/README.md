@@ -40,7 +40,7 @@ helmCharts:
     valuesInline:
       backup:
         repository:
-          name: s3
+          name: primary
       persistence:
         esphome-config:
           size: 10Gi
@@ -60,7 +60,7 @@ helmCharts:
     valuesInline:
       backup:
         repository:
-          name: s3
+          name: primary
       persistence:
         media:
           size: 2Ti
@@ -81,6 +81,10 @@ helmCharts:
   latest snapshot and restores it before the PVC is bound — e.g. after a PVC/node was deleted and recreated.
 - **Migrating data to a differently-named/namespaced PVC:** point `populate.sourcePolicy.name`/`namespace` at the
   _old_ `SnapshotPolicy` instead of leaving it defaulted to this release's own policy.
+- **Attaching to a PVC this chart doesn't own:** name the entry after that PVC and set `existingClaim: true` instead
+  of `size`. No `PersistentVolumeClaim` is rendered; the `Restore`/`SnapshotPolicy`/`SnapshotSchedule` still are, and
+  target/back up that PVC directly — the `Restore` uses `target.pvcRef` (write into an existing PVC) instead of
+  `target.populator`/`dataSourceRef`, since there's no PVC creation here for a populator to hook into.
 
 ## Values
 
@@ -94,8 +98,9 @@ does it in-template — see the comment above `persistence:` in `values.yaml`).
 | `commonLabels` / `commonAnnotations`                 | `{}`                              | Applied to every rendered resource.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `persistence`                                        | `{}`                              | One PVC per entry, keyed by PVC name. **Required — at least one entry.** See `values.yaml` for the full per-entry example (`media`/`config`).                                                                                                                                                                                                                                                                                                          |
 | `persistence.<name>.enabled`                         | `true`                            | Render this entry. Set `false` to temporarily drop one entry without deleting its config.                                                                                                                                                                                                                                                                                                                                                              |
-| `persistence.<name>.size`                            | —                                 | Requested PVC storage (e.g. `"10Gi"`). **Required on every entry** — there is no chart-wide default.                                                                                                                                                                                                                                                                                                                                                    |
-| `persistence.<name>.storageClass`                    | `""`                              | StorageClass; empty = cluster default.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `persistence.<name>.size`                            | —                                 | Requested PVC storage (e.g. `"10Gi"`). **Required, unless `existingClaim: true`** — there is no chart-wide default.                                                                                                                                                                                                                                                                                                                                     |
+| `persistence.<name>.existingClaim`                   | `false`                           | This entry's key is the name of a PVC that already exists and isn't created/managed by this chart. No `PersistentVolumeClaim` is rendered; `Restore`/`SnapshotPolicy`/`SnapshotSchedule` still are, targeting it directly (`Restore` uses `target.pvcRef`, not a `dataSourceRef` populator).                                                                                                                                                          |
+| `persistence.<name>.storageClass`                    | `""`                              | StorageClass; empty = cluster default. Ignored when `existingClaim: true`.                                                                                                                                                                                                                                                                                                                                                                              |
 | `persistence.<name>.accessMode`                      | `ReadWriteOnce`                   | Single access mode (bjw-s-labs/TrueCharts naming). Use `extraSpec.accessModes` for more than one.                                                                                                                                                                                                                                                                                                                                                       |
 | `persistence.<name>.volumeMode`                      | `Filesystem`                      | `Filesystem` or `Block`.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `persistence.<name>.retain`                          | `false`                           | Stamp `helm.sh/resource-policy: keep` — the PVC survives `helm uninstall`. Independent of, and in addition to, `argocd.protectPvcFromDeletion` below.                                                                                                                                                                                                                                                                                                  |

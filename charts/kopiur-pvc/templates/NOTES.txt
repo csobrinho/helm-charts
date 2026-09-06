@@ -10,9 +10,17 @@ kopiur-pvc release "{{ .Release.Name }}" installed in namespace {{ $ns }}:
 {{- $backupCfg := mergeOverwrite (deepCopy $.Values.backup) ($entry.backup | default dict) }}
 
 {{ $pvcName }}:
+{{- if $entry.existingClaim }}
+  - Using existing PersistentVolumeClaim/{{ $pvcName }} (not created/managed by this chart)
+{{- else }}
   - PersistentVolumeClaim/{{ $pvcName }} ({{ $entry.size }}{{ if $entry.storageClass }}, storageClass={{ $entry.storageClass }}{{ end }})
+{{- end }}
 {{- if $populateCfg.enabled }}
+{{- if $entry.existingClaim }}
+  - Restore/{{ $pvcName }} (direct restore via target.pvcRef, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }})
+{{- else }}
   - Restore/{{ $pvcName }} (passive populator, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }})
+{{- end }}
 {{- end }}
 {{- if $backupCfg.enabled }}
   - SnapshotPolicy/{{ $pvcName }} -> {{ $backupCfg.repository.kind }}/{{ $backupCfg.repository.name }} (copyMethod={{ $backupCfg.copyMethod }})
