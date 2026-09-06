@@ -11,20 +11,10 @@ commonAnnotations: {}
 
 # -- One PVC per entry, keyed by PVC name — same field naming as bjw-s-labs
 # app-template's / TrueCharts' `persistence` block (`size`, `storageClass`,
-# `accessMode`, `retain`, ...). There is no single-PVC mode: `persistence` is
-# the only way to get a PVC out of this chart, and it must have at least one
-# entry — empty by default, deliberately: there's no sane universal default
-# size, and (learned the hard way) baking in an example entry here means it
-# always renders ALONGSIDE whatever a caller adds under a different key,
-# since Helm's values-merge only fills in an entry's fields when the caller
-# reuses the exact same key name.
-#
-# Per entry: `size` is required; everything else (labels/annotations/
-# extraSpec/accessMode/volumeMode/retain, and `populate`/`backup`) is
-# optional and falls back to this chart's own built-in defaults (accessMode
-# ReadWriteOnce, volumeMode Filesystem, retain false, and the `populate:`/
-# `backup:` blocks further down, each entry's populate/backup sparse-
-# overriding those).
+# `accessMode`, `retain`, ...). Required — at least one entry. Only `size` is
+# required per entry; everything else falls back to defaults (see
+# templates/_helpers.tpl's `kopiur-pvc.entryDefaults`, and the `populate:`/
+# `backup:` blocks below, which each entry sparse-overrides).
 #
 # persistence:
 #   media:
