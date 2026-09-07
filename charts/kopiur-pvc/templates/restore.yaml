@@ -18,19 +18,12 @@
 {{- $_ := set $policy "waitTimeout" $populateCfg.waitTimeout -}}
 {{- end -}}
 {{- /*
-target is ALWAYS populator, even for existingClaim -- deliberately, not an
-oversight. target.pvcRef is an ACTIVE, one-shot restore: it writes into the
-PVC as soon as it resolves a snapshot, regardless of whether that PVC is
-already Bound and serving a live workload (see docs/restores.md). For a PVC
-this chart doesn't own, that's exactly the wrong default: the first time you
-point existingClaim at an app's already-populated volume, it would overwrite
-live data with whatever snapshot fromPolicy resolves to. target.populator is
-a passive claim -- Kopiur only acts when a PVC's own spec.dataSourceRef
-claims it, and safely no-ops (Completed/TargetAlreadyBound) on a PVC that's
-already Bound. So on the CURRENT owner of an existingClaim PVC, this Restore
-is inert by construction; it only ever does something once some future PVC
-creation (e.g. this same chart, ownership since flipped, on a fresh cluster)
-sets dataSourceRef to it.
+target is ALWAYS populator, even for existingClaim. target.pvcRef is an
+ACTIVE, one-shot restore -- it writes into the PVC the moment it resolves a
+snapshot, bound or not, so it would overwrite an already-populated volume
+the first time existingClaim points at one. populator is passive (only acts
+when a PVC's own dataSourceRef claims it) and safely no-ops on a PVC that's
+already Bound -- exactly what a chart-external PVC needs.
 */ -}}
 {{- $spec := dict "source" (dict "fromPolicy" $policyRef) "target" (dict "populator" dict) "policy" $policy -}}
 {{- if $populateCfg.credentialProjection -}}

@@ -83,13 +83,9 @@ helmCharts:
   _old_ `SnapshotPolicy` instead of leaving it defaulted to this release's own policy.
 - **Attaching to a PVC this chart doesn't own:** name the entry after that PVC and set `existingClaim: true` instead
   of `size`. No `PersistentVolumeClaim` is rendered; the `Restore`/`SnapshotPolicy`/`SnapshotSchedule` still are, and
-  target/back up that PVC directly. The `Restore` stays `target.populator` even here — deliberately, not
-  `target.pvcRef`: `pvcRef` is an *active* one-shot restore that writes into the PVC as soon as it resolves a
-  snapshot, live or not, so it's the wrong default for a PVC this chart doesn't own (the first time you point
-  `existingClaim` at an app's already-populated volume, it would overwrite live data). `populator` only ever acts
-  when a PVC's own `dataSourceRef` claims it and safely no-ops on one that's already `Bound` — so on the PVC's
-  current owner this Restore is inert by construction, and only starts doing something once some *future* PVC
-  creation (e.g. this same chart, with ownership flipped, on a freshly rebuilt cluster) points `dataSourceRef` at it.
+  target/back up that PVC directly. The `Restore` stays `target.populator` even here (not the active `target.pvcRef`)
+  so it's safely inert on a PVC this chart doesn't own — see the comment above `target` in `templates/restore.yaml`
+  for why.
 
 ## Values
 

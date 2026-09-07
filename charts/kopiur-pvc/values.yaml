@@ -13,20 +13,13 @@ commonAnnotations: {}
 # adds `mover.securityContext.{runAsUser,runAsGroup}` +
 # `mover.podSecurityContext.fsGroup` to BOTH the SnapshotPolicy's (backup)
 # and the Restore's (populate) mover spec -- each of `uid`/`gid` defaults to
-# the other when only one is set (the common case: a single-user app, same
-# numeric id for both). Matters most under `backup.copyMethod: Direct`, where
-# the source is mounted read-only and `fsGroup` alone can't make it readable
-# (see backup.readOnly's comment below) -- an explicit UID is the only thing
-# that works there. Also makes every future restore land files owned
-# correctly regardless of what happens to be recorded on a given snapshot
-# (kopiur replays whatever a backup recorded, which varies if some backups
-# ran with no live pod to infer an identity from — see
-# docs/security-context.md's `RecordedPinnedNoUid`).
-# Root (0) isn't supported by this shortcut — root also needs
-# `mover.securityContext.runAsNonRoot: false` + `privilegedMode: true`; set
-# `backup.mover`/`populate.mover` directly for that. An explicit
-# `backup.mover`/`populate.mover` field, chart-wide or sparse-overridden per
-# `persistence.<name>`, still wins over whatever this synthesizes.
+# the other when only one is set. Matters most under `backup.copyMethod:
+# Direct`, where the source is mounted read-only and `fsGroup` alone can't
+# make it readable (see backup.readOnly's comment below). Root (0) isn't
+# supported by this shortcut -- set `backup.mover`/`populate.mover` directly
+# for that. Sparse-overridable per `persistence.<name>.uid`/`.gid`; an
+# explicit `backup.mover`/`populate.mover` field still wins over whatever
+# this synthesizes.
 uid: null
 gid: null
 
@@ -59,7 +52,7 @@ gid: null
 #           beforeSnapshot:
 #             - command: ["curl", "-fsS", "-X", "POST", "http://plex:32400/..."]
 #   already-provisioned:                       # PVC name = the manually-created PVC's own name
-#     existingClaim: true   # no PVC rendered; Restore/SnapshotPolicy/SnapshotSchedule still are. The Restore stays a passive populator -- inert here (that PVC is presumably already Bound elsewhere), it only ever fires if a future PVC's dataSourceRef claims it (e.g. this same chart, ownership flipped, on a freshly rebuilt cluster)
+#     existingClaim: true   # no PVC rendered; Restore/SnapshotPolicy/SnapshotSchedule still are (see templates/restore.yaml for why Restore stays a passive populator here, not an active pvcRef)
 persistence: {}
 
 # -- Defaults for every `persistence.<name>.populate` (sparse-overridden per entry).
