@@ -54,11 +54,9 @@ spec:
     kind: ClusterRepository
     name: primary
   retention:
-    keepAnnual: 0
     keepDaily: 7
     keepHourly: 24
     keepLatest: 3
-    keepMonthly: 6
     keepWeekly: 4
   sources:
   - pvc:

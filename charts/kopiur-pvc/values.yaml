@@ -127,14 +127,17 @@ backup:
   # -- Kopia compression settings, e.g. {compressor: zstd}. Set to {} to omit.
   compression:
     compressor: zstd
-  # -- GFS retention policy for snapshots this policy produces.
+  # -- GFS retention policy for snapshots this policy produces. At a
+  # once-daily schedule this keeps every day for ~24 days, then one/week for
+  # ~4 more weeks (~8 weeks total) before a snapshot ages out and its storage
+  # is reclaimed at the next Maintenance run. No keepMonthly/keepAnnual here
+  # by default — add them (per-entry, via backup.retention) for anything that
+  # needs a longer recovery horizon than ~2 months.
   retention:
     keepLatest: 3
     keepHourly: 24
     keepDaily: 7
     keepWeekly: 4
-    keepMonthly: 6
-    keepAnnual: 0
   # -- Per-run mover overrides (resources, cache, securityContext) for backup
   # Jobs — merged with `inheritSecurityContextFrom` above into the same
   # `mover` object. Set to {} to add nothing beyond that.
