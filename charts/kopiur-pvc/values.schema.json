@@ -109,7 +109,7 @@
           "enabled": { "type": "boolean" },
           "existingClaim": {
             "type": "boolean",
-            "description": "This entry's key is the name of a PVC that already exists and isn't created/managed by this chart (`size`/`storageClass`/`accessMode`/... are ignored). The Restore/SnapshotPolicy/SnapshotSchedule still render, targeting that PVC directly (Restore uses target.pvcRef, not a dataSourceRef populator)."
+            "description": "This entry's key is the name of a PVC that already exists and isn't created/managed by this chart (`size`/`storageClass`/`accessMode`/... are ignored). The Restore/SnapshotPolicy/SnapshotSchedule still render. The Restore stays a passive dataSourceRef populator -- inert on this (presumably already-Bound) PVC by design; it only acts if some future PVC's dataSourceRef claims it."
           },
           "size": {
             "type": "string",

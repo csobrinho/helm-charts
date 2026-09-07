@@ -17,7 +17,7 @@ kopiur-pvc release "{{ .Release.Name }}" installed in namespace {{ $ns }}:
 {{- end }}
 {{- if $populateCfg.enabled }}
 {{- if $entry.existingClaim }}
-  - Restore/{{ $pvcName }} (direct restore via target.pvcRef, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }})
+  - Restore/{{ $pvcName }} (passive populator, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }}) — inert here: only fires if some future PVC's dataSourceRef claims it
 {{- else }}
   - Restore/{{ $pvcName }} (passive populator, onMissingSnapshot={{ $populateCfg.onMissingSnapshot }})
 {{- end }}

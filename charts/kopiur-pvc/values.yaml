@@ -34,7 +34,7 @@ commonAnnotations: {}
 #           beforeSnapshot:
 #             - command: ["curl", "-fsS", "-X", "POST", "http://plex:32400/..."]
 #   already-provisioned:                       # PVC name = the manually-created PVC's own name
-#     existingClaim: true   # no PVC rendered; Restore/SnapshotPolicy/SnapshotSchedule still are, targeting it directly (Restore uses target.pvcRef, not a dataSourceRef populator)
+#     existingClaim: true   # no PVC rendered; Restore/SnapshotPolicy/SnapshotSchedule still are. The Restore stays a passive populator -- inert here (that PVC is presumably already Bound elsewhere), it only ever fires if a future PVC's dataSourceRef claims it (e.g. this same chart, ownership flipped, on a freshly rebuilt cluster)
 persistence: {}
 
 # -- Defaults for every `persistence.<name>.populate` (sparse-overridden per entry).
