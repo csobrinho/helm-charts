@@ -61,6 +61,7 @@ spec:
   - pvc:
       name: esphome-config-manual
     readOnly: true
+    sourcePathStrategy: PvcName
   verification:
     quick:
       schedule:

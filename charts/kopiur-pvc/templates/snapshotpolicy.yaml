@@ -7,7 +7,14 @@
 {{- if $backupCfg.repository.namespace -}}
 {{- $_ := set $repo "namespace" $backupCfg.repository.namespace -}}
 {{- end -}}
-{{- $source := dict "pvc" (dict "name" $pvcName) "readOnly" $backupCfg.readOnly -}}
+{{- /*
+The CRD schema itself defaults spec.sources[].sourcePathStrategy to
+"PvcName" (OpenAPI structural-schema default, applied server-side and
+persisted on every live object) -- set it explicitly so the rendered
+manifest matches what's actually live, or ArgoCD sees permanent drift
+between git (field absent) and the cluster (field always present).
+*/ -}}
+{{- $source := dict "pvc" (dict "name" $pvcName) "readOnly" $backupCfg.readOnly "sourcePathStrategy" "PvcName" -}}
 {{- if $backupCfg.acknowledgeLiveMutation -}}
 {{- $_ := set $source "acknowledgeLiveMutation" true -}}
 {{- end -}}
