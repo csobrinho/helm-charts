@@ -28,7 +28,7 @@ between git (field absent) and the cluster (field always present).
 {{- if $backupCfg.retention -}}
 {{- $_ := set $spec "retention" $backupCfg.retention -}}
 {{- end -}}
-{{- $mover := dict -}}
+{{- $mover := fromYaml (include "kopiur-pvc.uidMover" (dict "uid" ($entry.uid | default $.Values.uid) "gid" ($entry.gid | default $.Values.gid))) -}}
 {{- if $backupCfg.inheritSecurityContextFrom -}}
 {{- $_ := set $mover "inheritSecurityContextFrom" $backupCfg.inheritSecurityContextFrom -}}
 {{- end -}}

@@ -1,0 +1,12 @@
+uid: 1000
+gid: 1000
+persistence:
+  esphome-config:
+    size: 2Gi
+    storageClass: ceph-block
+    uid: 568
+    gid: 568
+    backup:
+      copyMethod: Direct
+      repository:
+        name: primary

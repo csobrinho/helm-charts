@@ -91,6 +91,16 @@
     "namespaceOverride": { "type": "string" },
     "commonLabels": { "type": "object" },
     "commonAnnotations": { "type": "object" },
+    "uid": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Shorthand: adds mover.securityContext.runAsUser (+ runAsGroup/fsGroup, defaulting to `gid` or to this same value) to both the SnapshotPolicy and the Restore mover specs. Root (0) isn't supported by this shortcut -- set backup.mover/populate.mover directly for that."
+    },
+    "gid": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Shorthand: adds mover.securityContext.runAsGroup + mover.podSecurityContext.fsGroup (defaulting `uid`'s runAsUser to this value too, if `uid` is unset) to both the SnapshotPolicy and the Restore mover specs."
+    },
 
     "persistence": {
       "type": "object",
@@ -122,6 +132,16 @@
           },
           "volumeMode": { "type": "string", "enum": ["Filesystem", "Block"] },
           "retain": { "type": "boolean" },
+          "uid": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "description": "Per-entry override of the top-level `uid` shorthand -- same effect, scoped to this entry only."
+          },
+          "gid": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "description": "Per-entry override of the top-level `gid` shorthand -- same effect, scoped to this entry only."
+          },
           "labels": { "type": "object" },
           "annotations": { "type": "object" },
           "extraSpec": { "type": "object" },

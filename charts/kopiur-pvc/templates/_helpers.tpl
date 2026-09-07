@@ -19,11 +19,37 @@ existingClaim: false
 accessMode: ReadWriteOnce
 volumeMode: Filesystem
 retain: false
+uid: null
+gid: null
 labels: {}
 annotations: {}
 extraSpec: {}
 populate: {}
 backup: {}
+{{- end -}}
+
+{{/*
+Synthesizes mover.securityContext + mover.podSecurityContext from the
+top-level `uid`/`gid` shorthand -- takes a dict {uid, gid}, each defaulting
+to the other when only one is set, returns {} when NEITHER is set (0
+included: root isn't supported by this shortcut, it also needs
+privilegedMode: true, set mover.securityContext directly for that). Seed a
+mover dict with this FIRST (lowest priority) so an explicit backup.mover /
+populate.mover -- chart-wide or per persistence.<name> entry -- still wins
+field-by-field via the mergeOverwrite that follows it in both templates.
+*/}}
+{{- define "kopiur-pvc.uidMover" -}}
+{{- $uid := .uid | default .gid -}}
+{{- $gid := .gid | default .uid -}}
+{{- if or $uid $gid -}}
+securityContext:
+  runAsUser: {{ $uid }}
+  runAsGroup: {{ $gid }}
+podSecurityContext:
+  fsGroup: {{ $gid }}
+{{- else -}}
+{}
+{{- end -}}
 {{- end -}}
 
 {{- define "kopiur-pvc.labels" -}}

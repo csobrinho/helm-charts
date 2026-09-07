@@ -9,6 +9,27 @@ commonLabels: {}
 # -- Annotations applied to every resource this chart renders. Shared across every entry in `persistence`.
 commonAnnotations: {}
 
+# -- Shorthand: the numeric UID/GID that owns this app's data. Setting either
+# adds `mover.securityContext.{runAsUser,runAsGroup}` +
+# `mover.podSecurityContext.fsGroup` to BOTH the SnapshotPolicy's (backup)
+# and the Restore's (populate) mover spec -- each of `uid`/`gid` defaults to
+# the other when only one is set (the common case: a single-user app, same
+# numeric id for both). Matters most under `backup.copyMethod: Direct`, where
+# the source is mounted read-only and `fsGroup` alone can't make it readable
+# (see backup.readOnly's comment below) -- an explicit UID is the only thing
+# that works there. Also makes every future restore land files owned
+# correctly regardless of what happens to be recorded on a given snapshot
+# (kopiur replays whatever a backup recorded, which varies if some backups
+# ran with no live pod to infer an identity from — see
+# docs/security-context.md's `RecordedPinnedNoUid`).
+# Root (0) isn't supported by this shortcut — root also needs
+# `mover.securityContext.runAsNonRoot: false` + `privilegedMode: true`; set
+# `backup.mover`/`populate.mover` directly for that. An explicit
+# `backup.mover`/`populate.mover` field, chart-wide or sparse-overridden per
+# `persistence.<name>`, still wins over whatever this synthesizes.
+uid: null
+gid: null
+
 # -- One PVC per entry, keyed by PVC name — same field naming as bjw-s-labs
 # app-template's / TrueCharts' `persistence` block (`size`, `storageClass`,
 # `accessMode`, `retain`, ...). Required — at least one entry. Each entry needs
@@ -16,11 +37,15 @@ commonAnnotations: {}
 # doesn't — the entry's key is taken as the name of a PVC that already exists;
 # see below); everything else falls back to defaults (see
 # templates/_helpers.tpl's `kopiur-pvc.entryDefaults`, and the `populate:`/
-# `backup:` blocks below, which each entry sparse-overrides).
+# `backup:` blocks below, which each entry sparse-overrides). `uid`/`gid` here
+# override the top-level shorthand above, scoped to this entry only -- handy
+# when one release's several entries belong to apps with different owners.
 #
 # persistence:
 #   media:
 #     size: 2Ti
+#     uid: 1000    # this app's data is owned by a different uid than the chart-wide default
+#     gid: 1000
 #     storageClass: ceph-block
 #     populate:
 #       enabled: false   # too large to deploy-or-restore; backup-only
