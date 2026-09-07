@@ -6,9 +6,11 @@ metadata:
   name: esphome-config-manual
   namespace: existingclaim
   labels:
+    app.kubernetes.io/instance: existingclaim
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: esphome-config-manual
-    helm.sh/chart: kopiur-pvc-0.1.4
+    app.kubernetes.io/version: 0.10.7
+    helm.sh/chart: kopiur-pvc-0.1.5
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
@@ -35,9 +37,11 @@ metadata:
   name: esphome-config-manual
   namespace: existingclaim
   labels:
+    app.kubernetes.io/instance: existingclaim
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: esphome-config-manual
-    helm.sh/chart: kopiur-pvc-0.1.4
+    app.kubernetes.io/version: 0.10.7
+    helm.sh/chart: kopiur-pvc-0.1.5
   annotations:
     argocd.argoproj.io/sync-wave: "-2"
 spec:
@@ -76,9 +80,11 @@ metadata:
   name: esphome-config-manual
   namespace: existingclaim
   labels:
+    app.kubernetes.io/instance: existingclaim
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: esphome-config-manual
-    helm.sh/chart: kopiur-pvc-0.1.4
+    app.kubernetes.io/version: 0.10.7
+    helm.sh/chart: kopiur-pvc-0.1.5
   annotations:
     argocd.argoproj.io/sync-wave: "-2"
 spec:
