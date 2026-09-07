@@ -60,9 +60,19 @@ jobs:
             ct lint --all --validate-maintainers=false
           fi
 
+      # Pinned (not "latest") so the cache key below is stable and the tool
+      # version can't silently drift between runs.
+      - name: Cache kubeconform
+        id: kubeconform-cache
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/kubeconform
+          key: kubeconform-v0.8.0-linux-amd64
+
       - name: Install kubeconform
+        if: steps.kubeconform-cache.outputs.cache-hit != 'true'
         run: |
-          wget -q https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          wget -q https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
           tar xf kubeconform-linux-amd64.tar.gz
           sudo mv kubeconform /usr/local/bin/
 
@@ -103,6 +113,24 @@ jobs:
             echo "::endgroup::"
           done
 
+      # GitHub-hosted runners are ephemeral -- Docker's own layer cache never
+      # survives between runs, so without this every run re-pulls the ~500MB+
+      # node image from Docker Hub (slow, and exposed to Docker Hub's
+      # anonymous-pull rate limit). Safe to key on nothing but the digest
+      # below: it's pinned, so the cached tarball is valid forever until that
+      # pin changes, at which point the key changes too and this just misses
+      # once.
+      - name: Cache kind node image
+        id: kind-node-image-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/kind-node-image.tar
+          key: kind-node-image-a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+
+      - name: Load cached kind node image
+        if: steps.kind-node-image-cache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/kind-node-image.tar
+
       - name: Create kind cluster
         uses: helm/kind-action@v1.15.0
         with:
@@ -111,6 +139,10 @@ jobs:
           # pinned explicitly (with digest, per kind's own recommendation) so
           # a future kind-action bump can't silently change it.
           node_image: "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
+
+      - name: Save kind node image to cache
+        if: steps.kind-node-image-cache.outputs.cache-hit != 'true'
+        run: docker save -o /tmp/kind-node-image.tar "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 
       # `ct install` needs kopiur's CRDs + controller in the cluster (so the
       # admission webhook can actually accept/reject a SnapshotPolicy/Restore)
