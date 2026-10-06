@@ -108,7 +108,7 @@ spec:
       schedule:
         cron: H 3 * * 0
         jitter: 30m
-    successExpr: stats.errors == 0 && stats.files > 0
+    successExpr: stats.errors == 0 && (tier == 'quick' || stats.files > 0)
 
 
 ---
