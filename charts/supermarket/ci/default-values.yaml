@@ -1,5 +1,0 @@
-# chart-testing values: one user so the template renders a CronJob. Its
-# schedule never fires during a CI run, so the missing secret is never read.
-users:
-  - name: ci
-    schedule: "0 0 1 1 *"

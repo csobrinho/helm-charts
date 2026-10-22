@@ -5,7 +5,6 @@ Personal Helm charts, published as OCI artifacts to `oci://ghcr.io/csobrinho/hel
 | Chart | Description |
 |---|---|
 | [kopiur-pvc](charts/kopiur-pvc) | PVC wired to [kopiur](https://github.com/home-operations/kopiur) for scheduled backups and deploy-or-restore population. |
-| [supermarket](charts/supermarket) | One CronJob per user running [supermarket-api](https://github.com/csobrinho/supermarket-api). |
 
 ## Layout
 
