@@ -1,0 +1,145 @@
+---
+# Source: supermarket/templates/cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: supermarket-sobry
+spec:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  startingDeadlineSeconds: 60 # 1 min.
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          containers:
+            - name: supermarket
+              image: ghcr.io/csobrinho/supermarket-api:main@sha256:01de5161099084a4f36520cc8b6167fc8f0d388f4aeb9262ec9fe32c9bfb9e50
+              imagePullPolicy: IfNotPresent
+              resources:
+                limits:
+                  memory: 256Mi
+                  cpu: 200m
+                requests:
+                  memory: 128Mi
+                  cpu: 100m
+              env:
+                - name: TZ
+                  value: America/Los_Angeles
+                - name: USER_AGENT
+                  value: okhttp/4.12.0
+                - name: CLIP_ALL
+                  value: "true"
+                - name: APP_VERSION
+                  value: "2026.6.0"
+                - name: PROMETHEUS_ENDPOINT
+                  value: "http://infra-prometheus:9091"
+                - name: PROMETHEUS_JOB
+                  value: supermarket-sobry
+                - name: CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: supermarket-secret
+                      key: CLIENT_ID
+                - name: API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: supermarket-secret
+                      key: API_KEY
+                - name: REFRESH_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: supermarket-secret
+                      key: SOBRY_REFRESH_TOKEN
+                - name: STORE_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: supermarket-secret
+                      key: SOBRY_STORE_ID
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+
+---
+# Source: supermarket/templates/cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: supermarket-judy
+spec:
+  schedule: "2 * * * *"
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  startingDeadlineSeconds: 60 # 1 min.
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          containers:
+            - name: supermarket
+              image: ghcr.io/csobrinho/supermarket-api:main@sha256:01de5161099084a4f36520cc8b6167fc8f0d388f4aeb9262ec9fe32c9bfb9e50
+              imagePullPolicy: IfNotPresent
+              resources:
+                limits:
+                  memory: 256Mi
+                  cpu: 200m
+                requests:
+                  memory: 128Mi
+                  cpu: 100m
+              env:
+                - name: TZ
+                  value: America/Los_Angeles
+                - name: USER_AGENT
+                  value: okhttp/4.12.0
+                - name: CLIP_ALL
+                  value: "true"
+                - name: APP_VERSION
+                  value: "2026.6.0"
+                - name: PROMETHEUS_ENDPOINT
+                  value: "http://infra-prometheus:9091"
+                - name: PROMETHEUS_JOB
+                  value: supermarket-judy
+                - name: CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: supermarket-secret
+                      key: CLIENT_ID
+                - name: API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: supermarket-secret
+                      key: API_KEY
+                - name: REFRESH_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: supermarket-secret
+                      key: JUDY_REFRESH_TOKEN
+                - name: STORE_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: supermarket-secret
+                      key: JUDY_STORE_ID
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
